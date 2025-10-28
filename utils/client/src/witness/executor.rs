@@ -19,7 +19,7 @@ use kona_proof::{
     BootInfo, FlushableCache,
 };
 use spin::RwLock;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::{
     client::{advance_to_target, fetch_safe_head_hash},
@@ -36,13 +36,23 @@ pub async fn get_inputs_for_pipeline<O>(
 where
     O: CommsClient + FlushableCache + Send + Sync + Debug,
 {
+    debug!("Starting get_inputs_for_pipeline");
+
     ////////////////////////////////////////////////////////////////
     //                          PROLOGUE                          //
     ////////////////////////////////////////////////////////////////
 
+    debug!("Loading boot info from oracle");
     let boot = match BootInfo::load(oracle.as_ref()).await {
-        Ok(boot) => boot,
+        Ok(boot) => {
+            debug!(
+                "Successfully loaded boot info: claimed_l2_block_number={}, l1_head={:?}",
+                boot.claimed_l2_block_number, boot.l1_head
+            );
+            boot
+        }
         Err(e) => {
+            debug!("Failed to load boot info: {:?}", e);
             return Err(anyhow!("Failed to load boot info: {:?}", e));
         }
     };
@@ -50,32 +60,48 @@ where
     let boot_clone = boot.clone();
 
     let rollup_config = Arc::new(boot.rollup_config);
+    debug!("Fetching safe head hash for agreed_l2_output_root={:?}", boot.agreed_l2_output_root);
     let safe_head_hash = fetch_safe_head_hash(oracle.as_ref(), boot.agreed_l2_output_root).await?;
+    debug!("Got safe head hash: {:?}", safe_head_hash);
 
+    debug!("Creating L1 provider with l1_head={:?}", boot.l1_head);
     let mut l1_provider = OracleL1ChainProvider::new(boot.l1_head, oracle.clone());
+    debug!("Creating L2 provider with safe_head_hash={:?}", safe_head_hash);
     let mut l2_provider =
         OracleL2ChainProvider::new(safe_head_hash, rollup_config.clone(), oracle.clone());
 
     // Fetch the safe head's block header.
-    let safe_head = l2_provider
-        .header_by_hash(safe_head_hash)
-        .map(|header| Sealed::new_unchecked(header, safe_head_hash))?;
+    debug!("Fetching safe head block header by hash: {:?}", safe_head_hash);
+    let safe_head = l2_provider.header_by_hash(safe_head_hash).map(|header| {
+        debug!("Successfully retrieved header for safe head, block number: {}", header.number);
+        Sealed::new_unchecked(header, safe_head_hash)
+    })?;
 
     // If the claimed L2 block number is less than the safe head of the L2 chain, the claim is
     // invalid.
+    debug!(
+        "Validating claimed L2 block number {} against safe head number {}",
+        boot.claimed_l2_block_number, safe_head.number
+    );
     if boot.claimed_l2_block_number < safe_head.number {
+        debug!(
+            "Validation failed: claimed L2 block number {} < safe head {}",
+            boot.claimed_l2_block_number, safe_head.number
+        );
         return Err(anyhow!(
             "Claimed L2 block number {claimed} is less than the safe head {safe}",
             claimed = boot.claimed_l2_block_number,
             safe = safe_head.number
         ));
     }
+    debug!("Block number validation passed");
 
     ////////////////////////////////////////////////////////////////
     //                   DERIVATION & EXECUTION                   //
     ////////////////////////////////////////////////////////////////
 
     // Create a new derivation driver with the given boot information and oracle.
+    debug!("Creating new oracle pipeline cursor");
     let cursor = new_oracle_pipeline_cursor(
         rollup_config.as_ref(),
         safe_head,
@@ -83,7 +109,10 @@ where
         &mut l2_provider,
     )
     .await?;
+    debug!("Successfully created pipeline cursor");
+
     l2_provider.set_cursor(cursor.clone());
+    debug!("Set cursor on L2 provider, returning success");
 
     Ok((boot_clone, Some((cursor, l1_provider, l2_provider))))
 }

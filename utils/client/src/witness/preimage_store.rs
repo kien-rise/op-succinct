@@ -8,6 +8,7 @@ use kona_proof::FlushableCache;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::collections::HashMap;
+use tracing::debug;
 
 #[derive(
     Clone, Debug, Default, Serialize, Deserialize, rkyv::Serialize, rkyv::Archive, rkyv::Deserialize,
@@ -25,10 +26,27 @@ impl PreimageStore {
     }
 
     pub fn save_preimage(&mut self, key: PreimageKey, value: Vec<u8>) {
+        debug!("save_preimage called with key={:?}, value_len={}", key, value.len());
+
+        debug!("Checking preimage validity");
         check_preimage(&key, &value).expect("Invalid preimage");
+        debug!("Preimage validation passed");
+
         if let Some(old) = self.preimage_map.insert(key, value.clone()) {
+            debug!(
+                "Key already exists, checking for consistency. old_len={}, new_len={}",
+                old.len(),
+                value.len()
+            );
             assert_eq!(old, value, "Cannot overwrite key");
+            debug!("Consistency check passed for existing key");
+        } else {
+            debug!("New key inserted successfully");
         }
+        debug!(
+            "save_preimage completed successfully, total keys in store: {}",
+            self.preimage_map.len()
+        );
     }
 }
 
