@@ -52,17 +52,60 @@ impl PreimageStore {
 
 /// Check that the preimage matches the expected hash.
 pub fn check_preimage(key: &PreimageKey, value: &[u8]) -> PreimageOracleResult<()> {
-    if let Some(expected_hash) = match key.key_type() {
-        PreimageKeyType::Keccak256 => Some(keccak256(value).0),
-        PreimageKeyType::Sha256 => Some(sha2::Sha256::digest(value).into()),
-        PreimageKeyType::Local | PreimageKeyType::GlobalGeneric => None,
-        PreimageKeyType::Precompile => unimplemented!("Precompile not supported in zkVM"),
-        PreimageKeyType::Blob => unreachable!("Blob keys validated in blob witness"),
-    } {
-        if key != &PreimageKey::new(expected_hash, key.key_type()) {
-            return Err(PreimageOracleError::InvalidPreimageKey);
-        }
+    if value.len() < 256 {
+        debug!(
+            "check_preimage called with key={:?}, value_len={}, value={:02x?}",
+            key,
+            value.len(),
+            value
+        );
+    } else {
+        debug!("check_preimage called with key={:?}, value_len={}", key, value.len());
     }
+    debug!("Key type: {:?}", key.key_type());
+
+    if let Some(expected_hash) = match key.key_type() {
+        PreimageKeyType::Keccak256 => {
+            debug!("Computing Keccak256 hash for value");
+            let hash = keccak256(value).0;
+            debug!("Computed Keccak256 hash: {:?}", hash);
+            Some(hash)
+        }
+        PreimageKeyType::Sha256 => {
+            debug!("Computing SHA256 hash for value");
+            let hash: [u8; 32] = sha2::Sha256::digest(value).into();
+            debug!("Computed SHA256 hash: {:?}", hash);
+            Some(hash)
+        }
+        PreimageKeyType::Local | PreimageKeyType::GlobalGeneric => {
+            debug!("Local/GlobalGeneric key type - no hash validation needed");
+            None
+        }
+        PreimageKeyType::Precompile => {
+            debug!("Precompile key type - not supported in zkVM");
+            unimplemented!("Precompile not supported in zkVM")
+        }
+        PreimageKeyType::Blob => {
+            debug!("Blob key type - should be validated elsewhere");
+            unreachable!("Blob keys validated in blob witness")
+        }
+    } {
+        debug!("Expected hash computed, comparing with key");
+        let expected_key = PreimageKey::new(expected_hash, key.key_type());
+        debug!("Expected key: {:?}", expected_key);
+        debug!("Actual key: {:?}", key);
+
+        if key != &expected_key {
+            debug!("Key mismatch! Expected: {:?}, Got: {:?}", expected_key, key);
+            return Err(PreimageOracleError::InvalidPreimageKey);
+        } else {
+            debug!("Key validation passed - hashes match");
+        }
+    } else {
+        debug!("No hash validation required for this key type");
+    }
+
+    debug!("check_preimage completed successfully");
     Ok(())
 }
 
