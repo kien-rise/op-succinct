@@ -318,17 +318,40 @@ dependencies = [
  "alloy-consensus",
  "alloy-eips",
  "alloy-hardforks 0.3.5",
- "alloy-op-hardforks",
+ "alloy-op-hardforks 0.3.5",
  "alloy-primitives",
  "alloy-rpc-types-engine",
  "alloy-rpc-types-eth",
  "alloy-sol-types",
  "auto_impl",
  "derive_more 2.0.1",
- "op-alloy-consensus",
- "op-alloy-rpc-types-engine",
- "op-revm",
- "revm",
+ "op-alloy-consensus 0.20.0",
+ "op-alloy-rpc-types-engine 0.20.0",
+ "op-revm 10.1.0",
+ "revm 29.0.1",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "alloy-evm"
+version = "0.22.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28bd79e109f2b3ff81ed1a93ed3d07cf175ca627fd4fad176df721041cc40dcc"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-hardforks 0.4.2",
+ "alloy-op-hardforks 0.4.2",
+ "alloy-primitives",
+ "alloy-rpc-types-engine",
+ "alloy-rpc-types-eth",
+ "alloy-sol-types",
+ "auto_impl",
+ "derive_more 2.0.1",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
+ "op-revm 11.2.0",
+ "revm 30.2.0",
  "thiserror 2.0.17",
 ]
 
@@ -364,6 +387,20 @@ name = "alloy-hardforks"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "889eb3949b58368a09d4f16931c660275ef5fb08e5fbd4a96573b19c7085c41f"
+dependencies = [
+ "alloy-chains",
+ "alloy-eip2124",
+ "alloy-primitives",
+ "auto_impl",
+ "dyn-clone",
+ "serde",
+]
+
+[[package]]
+name = "alloy-hardforks"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52ffa71f397f89c72a27d9c7e3340eed7981a18df9a257dd16b835ef7f53aef6"
 dependencies = [
  "alloy-chains",
  "alloy-eip2124",
@@ -468,13 +505,31 @@ checksum = "17aaeb600740c181bf29c9f138f9b228d115ea74fa6d0f0343e1952f1a766968"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
- "alloy-op-hardforks",
+ "alloy-evm 0.21.2",
+ "alloy-op-hardforks 0.3.5",
  "alloy-primitives",
  "auto_impl",
- "op-alloy-consensus",
- "op-revm",
- "revm",
+ "op-alloy-consensus 0.20.0",
+ "op-revm 10.1.0",
+ "revm 29.0.1",
+]
+
+[[package]]
+name = "alloy-op-evm"
+version = "0.22.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35db78840a29b14fec51f3399a6dc82ecc815a5766eb80b32e69a0c92adddc14"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-evm 0.22.5",
+ "alloy-op-hardforks 0.4.2",
+ "alloy-primitives",
+ "auto_impl",
+ "op-alloy-consensus 0.21.0",
+ "op-revm 11.2.0",
+ "revm 30.2.0",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -485,6 +540,19 @@ checksum = "599c1d7dfbccb66603cb93fde00980d12848d32fe5e814f50562104a92df6487"
 dependencies = [
  "alloy-chains",
  "alloy-hardforks 0.3.5",
+ "alloy-primitives",
+ "auto_impl",
+ "serde",
+]
+
+[[package]]
+name = "alloy-op-hardforks"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b43e1c305c2f0e4b8878b943fa2f75234803bfca5cd4a4dc0a0a772842a278ea"
+dependencies = [
+ "alloy-chains",
+ "alloy-hardforks 0.4.2",
  "alloy-primitives",
  "auto_impl",
  "serde",
@@ -4812,8 +4880,8 @@ dependencies = [
  "alloy-primitives",
  "async-trait",
  "celestia-types",
- "kona-derive",
- "kona-protocol",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
  "tracing",
 ]
 
@@ -4823,21 +4891,21 @@ version = "0.1.0"
 source = "git+https://github.com/celestiaorg/hana?tag=v1.2.0-mocha#40f18eb59ccd1602f8788e64c735cbd5624c801d"
 dependencies = [
  "alloy-consensus",
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "alloy-primitives",
  "cfg-if",
  "hana-celestia",
  "hana-oracle",
- "kona-client",
- "kona-derive",
- "kona-driver",
- "kona-executor",
- "kona-preimage",
- "kona-proof",
- "kona-std-fpvm",
- "kona-std-fpvm-proc",
- "op-alloy-consensus",
- "op-revm",
+ "kona-client 1.0.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-std-fpvm 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-std-fpvm-proc 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "op-alloy-consensus 0.20.0",
+ "op-revm 10.1.0",
  "thiserror 2.0.17",
  "tracing",
 ]
@@ -4857,15 +4925,15 @@ dependencies = [
  "hana-client",
  "hana-oracle",
  "hana-proofs",
- "kona-cli",
- "kona-client",
- "kona-genesis",
- "kona-host",
- "kona-preimage",
- "kona-proof",
- "kona-providers-alloy",
- "kona-std-fpvm",
- "op-alloy-network",
+ "kona-cli 0.3.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-client 1.0.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-host 1.0.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-providers-alloy 0.3.3 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-std-fpvm 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "op-alloy-network 0.20.0",
  "serde",
  "serde_json",
  "tokio",
@@ -4884,8 +4952,8 @@ dependencies = [
  "celestia-types",
  "hana-blobstream",
  "hana-celestia",
- "kona-preimage",
- "kona-proof",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
  "serde",
  "tracing",
 ]
@@ -5072,16 +5140,16 @@ version = "0.1.0"
 source = "git+https://github.com/Layr-Labs/hokulea?rev=bd6fb19379efcbd1118fe2f5c72318a315940250#bd6fb19379efcbd1118fe2f5c72318a315940250"
 dependencies = [
  "alloy-consensus",
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "hokulea-eigenda",
- "kona-client",
- "kona-derive",
- "kona-driver",
- "kona-executor",
- "kona-preimage",
- "kona-proof",
- "op-alloy-consensus",
- "op-revm",
+ "kona-client 1.0.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "op-alloy-consensus 0.20.0",
+ "op-revm 10.1.0",
  "tracing",
 ]
 
@@ -5090,17 +5158,17 @@ name = "hokulea-client-bin"
 version = "0.1.0"
 source = "git+https://github.com/Layr-Labs/hokulea?rev=bd6fb19379efcbd1118fe2f5c72318a315940250#bd6fb19379efcbd1118fe2f5c72318a315940250"
 dependencies = [
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "cfg-if",
  "hokulea-client",
  "hokulea-proof",
- "kona-client",
- "kona-preimage",
- "kona-proof",
- "kona-std-fpvm",
- "kona-std-fpvm-proc",
- "op-alloy-consensus",
- "op-revm",
+ "kona-client 1.0.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-std-fpvm 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-std-fpvm-proc 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "op-alloy-consensus 0.20.0",
+ "op-revm 10.1.0",
 ]
 
 [[package]]
@@ -5123,8 +5191,8 @@ dependencies = [
  "alloy-primitives",
  "async-trait",
  "eigenda-cert",
- "kona-derive",
- "kona-protocol",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
  "rust-kzg-bn254-primitives",
  "serde",
  "thiserror 2.0.17",
@@ -5144,12 +5212,12 @@ dependencies = [
  "hokulea-client-bin",
  "hokulea-eigenda",
  "hokulea-proof",
- "kona-cli",
- "kona-client",
- "kona-host",
- "kona-preimage",
- "kona-proof",
- "kona-std-fpvm",
+ "kona-cli 0.3.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-client 1.0.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-host 1.0.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-std-fpvm 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
  "reqwest 0.12.23",
  "serde",
  "thiserror 2.0.17",
@@ -5170,8 +5238,8 @@ dependencies = [
  "canoe-verifier",
  "eigenda-cert",
  "hokulea-eigenda",
- "kona-preimage",
- "kona-proof",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
  "rust-kzg-bn254-primitives",
  "rust-kzg-bn254-verifier",
  "serde",
@@ -5195,8 +5263,8 @@ dependencies = [
  "hokulea-compute-proof",
  "hokulea-eigenda",
  "hokulea-proof",
- "kona-preimage",
- "kona-proof",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
  "tracing",
 ]
 
@@ -5208,8 +5276,8 @@ dependencies = [
  "canoe-verifier",
  "canoe-verifier-address-fetcher",
  "hokulea-proof",
- "kona-preimage",
- "kona-proof",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
 ]
 
 [[package]]
@@ -6199,8 +6267,28 @@ dependencies = [
  "alloy-chains",
  "alloy-primitives",
  "clap",
- "kona-genesis",
- "kona-registry",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "libc",
+ "metrics-exporter-prometheus 0.17.2",
+ "metrics-process",
+ "serde",
+ "thiserror 2.0.17",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber 0.3.20",
+]
+
+[[package]]
+name = "kona-cli"
+version = "0.3.2"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-chains",
+ "alloy-primitives",
+ "clap",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "libc",
  "metrics-exporter-prometheus 0.17.2",
  "metrics-process",
@@ -6218,31 +6306,70 @@ source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596af
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
- "alloy-op-evm",
+ "alloy-evm 0.21.2",
+ "alloy-op-evm 0.21.2",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-rpc-types-engine",
  "async-trait",
  "cfg-if",
- "kona-derive",
- "kona-driver",
- "kona-executor",
- "kona-genesis",
- "kona-interop",
- "kona-mpt",
- "kona-preimage",
- "kona-proof",
- "kona-proof-interop",
- "kona-protocol",
- "kona-registry",
- "kona-std-fpvm",
- "kona-std-fpvm-proc",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-interop 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-mpt 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof-interop 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-std-fpvm 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-std-fpvm-proc 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
  "lru 0.16.1",
- "op-alloy-consensus",
- "op-alloy-rpc-types-engine",
- "op-revm",
- "revm",
+ "op-alloy-consensus 0.20.0",
+ "op-alloy-rpc-types-engine 0.20.0",
+ "op-revm 10.1.0",
+ "revm 29.0.1",
+ "serde",
+ "serde_json",
+ "spin 0.10.0",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
+name = "kona-client"
+version = "1.0.2"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-evm 0.22.5",
+ "alloy-op-evm 0.22.5",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-rpc-types-engine",
+ "async-trait",
+ "cfg-if",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-interop 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-mpt 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof-interop 0.2.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-std-fpvm 0.2.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-std-fpvm-proc 0.2.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "lru 0.16.1",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
+ "op-revm 11.2.0",
+ "revm 30.2.0",
  "serde",
  "serde_json",
  "spin 0.10.0",
@@ -6261,12 +6388,33 @@ dependencies = [
  "alloy-rlp",
  "alloy-rpc-types-engine",
  "async-trait",
- "kona-genesis",
- "kona-hardforks",
- "kona-macros",
- "kona-protocol",
- "op-alloy-consensus",
- "op-alloy-rpc-types-engine",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-hardforks 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-macros 0.1.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "op-alloy-consensus 0.20.0",
+ "op-alloy-rpc-types-engine 0.20.0",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
+name = "kona-derive"
+version = "0.4.5"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-rpc-types-engine",
+ "async-trait",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-hardforks 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-macros 0.1.2 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
  "thiserror 2.0.17",
  "tracing",
 ]
@@ -6274,14 +6422,14 @@ dependencies = [
 [[package]]
 name = "kona-disc"
 version = "0.1.2"
-source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596afa96f08eb1b2e14db269fabeb673ea"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
 dependencies = [
  "alloy-rlp",
  "backon",
  "derive_more 2.0.1",
  "discv5",
- "kona-genesis",
- "kona-macros",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-macros 0.1.2 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "kona-peers",
  "libp2p",
  "rand 0.9.2",
@@ -6296,16 +6444,37 @@ version = "0.4.0"
 source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596afa96f08eb1b2e14db269fabeb673ea"
 dependencies = [
  "alloy-consensus",
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "alloy-primitives",
  "alloy-rlp",
  "async-trait",
- "kona-derive",
- "kona-executor",
- "kona-genesis",
- "kona-protocol",
- "op-alloy-consensus",
- "op-alloy-rpc-types-engine",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "op-alloy-consensus 0.20.0",
+ "op-alloy-rpc-types-engine 0.20.0",
+ "spin 0.10.0",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
+name = "kona-driver"
+version = "0.4.0"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-consensus",
+ "alloy-evm 0.22.5",
+ "alloy-primitives",
+ "alloy-rlp",
+ "async-trait",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
  "spin 0.10.0",
  "thiserror 2.0.17",
  "tracing",
@@ -6314,7 +6483,7 @@ dependencies = [
 [[package]]
 name = "kona-engine"
 version = "0.1.2"
-source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596afa96f08eb1b2e14db269fabeb673ea"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6330,15 +6499,15 @@ dependencies = [
  "async-trait",
  "derive_more 2.0.1",
  "http-body-util",
- "kona-genesis",
- "kona-macros",
- "kona-protocol",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-macros 0.1.2 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "kona-sources",
- "op-alloy-consensus",
- "op-alloy-network",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-network 0.21.0",
  "op-alloy-provider",
- "op-alloy-rpc-types",
- "op-alloy-rpc-types-engine",
+ "op-alloy-rpc-types 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
@@ -6356,19 +6525,43 @@ source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596af
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
- "alloy-op-evm",
- "alloy-op-hardforks",
+ "alloy-evm 0.21.2",
+ "alloy-op-evm 0.21.2",
+ "alloy-op-hardforks 0.3.5",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-trie",
- "kona-genesis",
- "kona-mpt",
- "kona-protocol",
- "op-alloy-consensus",
- "op-alloy-rpc-types-engine",
- "op-revm",
- "revm",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-mpt 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "op-alloy-consensus 0.20.0",
+ "op-alloy-rpc-types-engine 0.20.0",
+ "op-revm 10.1.0",
+ "revm 29.0.1",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
+name = "kona-executor"
+version = "0.4.0"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-evm 0.22.5",
+ "alloy-op-evm 0.22.5",
+ "alloy-op-hardforks 0.4.2",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-trie",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-mpt 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
+ "op-revm 11.2.0",
+ "revm 30.2.0",
  "thiserror 2.0.17",
  "tracing",
 ]
@@ -6383,11 +6576,31 @@ dependencies = [
  "alloy-eips",
  "alloy-genesis",
  "alloy-hardforks 0.3.5",
- "alloy-op-hardforks",
+ "alloy-op-hardforks 0.3.5",
  "alloy-primitives",
  "alloy-sol-types",
  "derive_more 2.0.1",
- "op-revm",
+ "op-revm 10.1.0",
+ "serde",
+ "serde_repr",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "kona-genesis"
+version = "0.4.5"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-chains",
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-genesis",
+ "alloy-hardforks 0.4.2",
+ "alloy-op-hardforks 0.4.2",
+ "alloy-primitives",
+ "alloy-sol-types",
+ "derive_more 2.0.1",
+ "op-revm 11.2.0",
  "serde",
  "serde_repr",
  "thiserror 2.0.17",
@@ -6396,7 +6609,7 @@ dependencies = [
 [[package]]
 name = "kona-gossip"
 version = "0.1.2"
-source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596afa96f08eb1b2e14db269fabeb673ea"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6408,15 +6621,15 @@ dependencies = [
  "futures",
  "ipnet",
  "kona-disc",
- "kona-genesis",
- "kona-macros",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-macros 0.1.2 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "kona-peers",
  "lazy_static",
  "libp2p",
  "libp2p-identity",
  "libp2p-stream",
- "op-alloy-consensus",
- "op-alloy-rpc-types-engine",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
  "openssl",
  "serde",
  "serde_repr",
@@ -6433,8 +6646,19 @@ source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596af
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
- "kona-protocol",
- "op-alloy-consensus",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "op-alloy-consensus 0.20.0",
+]
+
+[[package]]
+name = "kona-hardforks"
+version = "0.4.5"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-eips",
+ "alloy-primitives",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "op-alloy-consensus 0.21.0",
 ]
 
 [[package]]
@@ -6444,7 +6668,7 @@ source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596af
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-op-evm",
+ "alloy-op-evm 0.21.2",
  "alloy-primitives",
  "alloy-provider",
  "alloy-rlp",
@@ -6458,24 +6682,72 @@ dependencies = [
  "ark-ff 0.5.0",
  "async-trait",
  "clap",
- "kona-cli",
- "kona-client",
- "kona-derive",
- "kona-driver",
- "kona-executor",
- "kona-genesis",
- "kona-mpt",
- "kona-preimage",
- "kona-proof",
- "kona-proof-interop",
- "kona-protocol",
- "kona-providers-alloy",
- "kona-registry",
- "kona-std-fpvm",
- "op-alloy-network",
- "op-alloy-rpc-types-engine",
+ "kona-cli 0.3.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-client 1.0.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-mpt 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof-interop 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-providers-alloy 0.3.3 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-std-fpvm 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "op-alloy-network 0.20.0",
+ "op-alloy-rpc-types-engine 0.20.0",
  "reqwest 0.12.23",
- "revm",
+ "revm 29.0.1",
+ "rocksdb",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.20",
+]
+
+[[package]]
+name = "kona-host"
+version = "1.0.2"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-op-evm 0.22.5",
+ "alloy-primitives",
+ "alloy-provider",
+ "alloy-rlp",
+ "alloy-rpc-client",
+ "alloy-rpc-types",
+ "alloy-rpc-types-beacon",
+ "alloy-serde",
+ "alloy-transport",
+ "alloy-transport-http",
+ "anyhow",
+ "ark-ff 0.5.0",
+ "async-trait",
+ "clap",
+ "kona-cli 0.3.2 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-client 1.0.2 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-mpt 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof-interop 0.2.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-providers-alloy 0.3.3 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-std-fpvm 0.2.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "op-alloy-network 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
+ "reqwest 0.12.23",
+ "revm 30.2.0",
  "rocksdb",
  "serde",
  "serde_json",
@@ -6498,10 +6770,32 @@ dependencies = [
  "alloy-sol-types",
  "async-trait",
  "derive_more 2.0.1",
- "kona-genesis",
- "kona-protocol",
- "kona-registry",
- "op-alloy-consensus",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "op-alloy-consensus 0.20.0",
+ "serde",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
+name = "kona-interop"
+version = "0.4.5"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-serde",
+ "alloy-sol-types",
+ "async-trait",
+ "derive_more 2.0.1",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "op-alloy-consensus 0.21.0",
  "serde",
  "thiserror 2.0.17",
  "tracing",
@@ -6513,6 +6807,11 @@ version = "0.1.2"
 source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596afa96f08eb1b2e14db269fabeb673ea"
 
 [[package]]
+name = "kona-macros"
+version = "0.1.2"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+
+[[package]]
 name = "kona-mpt"
 version = "0.3.0"
 source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596afa96f08eb1b2e14db269fabeb673ea"
@@ -6520,21 +6819,33 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "alloy-trie",
- "op-alloy-rpc-types-engine",
+ "op-alloy-rpc-types-engine 0.20.0",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "kona-mpt"
+version = "0.3.0"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-trie",
+ "op-alloy-rpc-types-engine 0.21.0",
  "thiserror 2.0.17",
 ]
 
 [[package]]
 name = "kona-peers"
 version = "0.1.2"
-source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596afa96f08eb1b2e14db269fabeb673ea"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "derive_more 2.0.1",
  "dirs 6.0.0",
  "discv5",
- "kona-registry",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "lazy_static",
  "libp2p",
  "libp2p-identity",
@@ -6555,6 +6866,19 @@ dependencies = [
  "alloy-primitives",
  "async-channel",
  "async-trait",
+ "serde",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
+name = "kona-preimage"
+version = "0.3.0"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-primitives",
+ "async-channel",
+ "async-trait",
  "rkyv",
  "serde",
  "thiserror 2.0.17",
@@ -6568,27 +6892,63 @@ source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596af
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
- "alloy-op-evm",
+ "alloy-evm 0.21.2",
+ "alloy-op-evm 0.21.2",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-trie",
  "ark-bls12-381",
  "ark-ff 0.5.0",
  "async-trait",
- "kona-derive",
- "kona-driver",
- "kona-executor",
- "kona-genesis",
- "kona-mpt",
- "kona-preimage",
- "kona-protocol",
- "kona-registry",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-mpt 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
  "lazy_static",
  "lru 0.16.1",
- "op-alloy-consensus",
- "op-alloy-rpc-types-engine",
- "op-revm",
+ "op-alloy-consensus 0.20.0",
+ "op-alloy-rpc-types-engine 0.20.0",
+ "op-revm 10.1.0",
+ "serde",
+ "serde_json",
+ "spin 0.10.0",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "kona-proof"
+version = "0.3.0"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-evm 0.22.5",
+ "alloy-op-evm 0.22.5",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-trie",
+ "ark-bls12-381",
+ "ark-ff 0.5.0",
+ "async-trait",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-mpt 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "lazy_static",
+ "lru 0.16.1",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
+ "op-revm 11.2.0",
  "serde",
  "serde_json",
  "spin 0.10.0",
@@ -6604,24 +6964,56 @@ source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596af
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
- "alloy-op-evm",
+ "alloy-evm 0.21.2",
+ "alloy-op-evm 0.21.2",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-rpc-types-engine",
  "async-trait",
- "kona-executor",
- "kona-genesis",
- "kona-interop",
- "kona-mpt",
- "kona-preimage",
- "kona-proof",
- "kona-protocol",
- "kona-registry",
- "op-alloy-consensus",
- "op-alloy-rpc-types-engine",
- "op-revm",
- "revm",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-interop 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-mpt 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "op-alloy-consensus 0.20.0",
+ "op-alloy-rpc-types-engine 0.20.0",
+ "op-revm 10.1.0",
+ "revm 29.0.1",
+ "serde",
+ "serde_json",
+ "spin 0.10.0",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
+name = "kona-proof-interop"
+version = "0.2.0"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-evm 0.22.5",
+ "alloy-op-evm 0.22.5",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-rpc-types-engine",
+ "async-trait",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-interop 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-mpt 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
+ "op-revm 11.2.0",
+ "revm 30.2.0",
  "serde",
  "serde_json",
  "spin 0.10.0",
@@ -6646,11 +7038,41 @@ dependencies = [
  "async-trait",
  "brotli",
  "derive_more 2.0.1",
- "kona-genesis",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
  "miniz_oxide",
- "op-alloy-consensus",
- "op-alloy-rpc-types",
- "op-alloy-rpc-types-engine",
+ "op-alloy-consensus 0.20.0",
+ "op-alloy-rpc-types 0.20.0",
+ "op-alloy-rpc-types-engine 0.20.0",
+ "serde",
+ "spin 0.10.0",
+ "thiserror 2.0.17",
+ "tracing",
+ "tracing-subscriber 0.3.20",
+ "unsigned-varint 0.8.0",
+]
+
+[[package]]
+name = "kona-protocol"
+version = "0.4.5"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-hardforks 0.4.2",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-rpc-types-engine",
+ "alloy-rpc-types-eth",
+ "alloy-serde",
+ "async-trait",
+ "brotli",
+ "derive_more 2.0.1",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "miniz_oxide",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-rpc-types 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
  "serde",
  "spin 0.10.0",
  "thiserror 2.0.17",
@@ -6677,13 +7099,44 @@ dependencies = [
  "async-trait",
  "c-kzg",
  "http-body-util",
- "kona-derive",
- "kona-genesis",
- "kona-macros",
- "kona-protocol",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-macros 0.1.2 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
  "lru 0.16.1",
- "op-alloy-consensus",
- "op-alloy-network",
+ "op-alloy-consensus 0.20.0",
+ "op-alloy-network 0.20.0",
+ "reqwest 0.12.23",
+ "serde",
+ "thiserror 2.0.17",
+ "tower 0.5.2",
+]
+
+[[package]]
+name = "kona-providers-alloy"
+version = "0.3.3"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-primitives",
+ "alloy-provider",
+ "alloy-rpc-client",
+ "alloy-rpc-types-beacon",
+ "alloy-rpc-types-engine",
+ "alloy-serde",
+ "alloy-transport",
+ "alloy-transport-http",
+ "async-trait",
+ "c-kzg",
+ "http-body-util",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-macros 0.1.2 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "lru 0.16.1",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-network 0.21.0",
  "reqwest 0.12.23",
  "serde",
  "thiserror 2.0.17",
@@ -6699,9 +7152,28 @@ dependencies = [
  "alloy-eips",
  "alloy-genesis",
  "alloy-hardforks 0.3.5",
- "alloy-op-hardforks",
+ "alloy-op-hardforks 0.3.5",
  "alloy-primitives",
- "kona-genesis",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "lazy_static",
+ "serde",
+ "serde_json",
+ "tabled",
+ "toml 0.8.23",
+]
+
+[[package]]
+name = "kona-registry"
+version = "0.4.5"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "alloy-chains",
+ "alloy-eips",
+ "alloy-genesis",
+ "alloy-hardforks 0.4.2",
+ "alloy-op-hardforks 0.4.2",
+ "alloy-primitives",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "lazy_static",
  "serde",
  "serde_json",
@@ -6712,7 +7184,7 @@ dependencies = [
 [[package]]
 name = "kona-rpc"
 version = "0.3.2"
-source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596afa96f08eb1b2e14db269fabeb673ea"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -6724,15 +7196,15 @@ dependencies = [
  "ipnet",
  "jsonrpsee 0.25.1",
  "kona-engine",
- "kona-genesis",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "kona-gossip",
- "kona-macros",
- "kona-protocol",
+ "kona-macros 0.1.2 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "libp2p",
- "op-alloy-consensus",
+ "op-alloy-consensus 0.21.0",
  "op-alloy-rpc-jsonrpsee",
- "op-alloy-rpc-types",
- "op-alloy-rpc-types-engine",
+ "op-alloy-rpc-types 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
  "serde",
  "thiserror 2.0.17",
  "tokio",
@@ -6742,7 +7214,7 @@ dependencies = [
 [[package]]
 name = "kona-sources"
 version = "0.1.2"
-source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596afa96f08eb1b2e14db269fabeb673ea"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -6753,11 +7225,11 @@ dependencies = [
  "alloy-transport",
  "alloy-transport-http",
  "derive_more 2.0.1",
- "kona-genesis",
- "kona-protocol",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "notify",
- "op-alloy-network",
- "op-alloy-rpc-types-engine",
+ "op-alloy-network 0.21.0",
+ "op-alloy-rpc-types-engine 0.21.0",
  "reqwest 0.12.23",
  "rustls 0.23.32",
  "rustls-pemfile 2.2.0",
@@ -6777,7 +7249,19 @@ dependencies = [
  "async-trait",
  "buddy_system_allocator",
  "cfg-if",
- "kona-preimage",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "kona-std-fpvm"
+version = "0.2.0"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "async-trait",
+ "buddy_system_allocator",
+ "cfg-if",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "thiserror 2.0.17",
 ]
 
@@ -6787,7 +7271,19 @@ version = "0.2.0"
 source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3#aa7e89596afa96f08eb1b2e14db269fabeb673ea"
 dependencies = [
  "cfg-if",
- "kona-std-fpvm",
+ "kona-std-fpvm 0.2.0 (git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.1.3)",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.106",
+]
+
+[[package]]
+name = "kona-std-fpvm-proc"
+version = "0.2.0"
+source = "git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467#4fd947153c8dc99c1a28b463b880bd2135ece467"
+dependencies = [
+ "cfg-if",
+ "kona-std-fpvm 0.2.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "proc-macro2",
  "quote",
  "syn 2.0.106",
@@ -8320,6 +8816,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "op-alloy-consensus"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf1fc8aa0e2f5b136d101630be009e4e6dbdd1f17bc3ce670f431511600d2930"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-network",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-rpc-types-eth",
+ "alloy-serde",
+ "derive_more 2.0.1",
+ "serde",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "op-alloy-network"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8331,15 +8845,31 @@ dependencies = [
  "alloy-provider",
  "alloy-rpc-types-eth",
  "alloy-signer",
- "op-alloy-consensus",
- "op-alloy-rpc-types",
+ "op-alloy-consensus 0.20.0",
+ "op-alloy-rpc-types 0.20.0",
+]
+
+[[package]]
+name = "op-alloy-network"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c5cca341184dbfcb49dbc124e5958e6a857499f04782907e5d969abb644e0b6"
+dependencies = [
+ "alloy-consensus",
+ "alloy-network",
+ "alloy-primitives",
+ "alloy-provider",
+ "alloy-rpc-types-eth",
+ "alloy-signer",
+ "op-alloy-consensus 0.21.0",
+ "op-alloy-rpc-types 0.21.0",
 ]
 
 [[package]]
 name = "op-alloy-provider"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f21ac4548ca19f15db4f199f39c567ab676a85622e57a2fda02e8a23432bdcf"
+checksum = "54a05215cbe54264d76a5a33d207bc988f1663c931be2365d6722824c1681553"
 dependencies = [
  "alloy-network",
  "alloy-primitives",
@@ -8347,14 +8877,14 @@ dependencies = [
  "alloy-rpc-types-engine",
  "alloy-transport",
  "async-trait",
- "op-alloy-rpc-types-engine",
+ "op-alloy-rpc-types-engine 0.21.0",
 ]
 
 [[package]]
 name = "op-alloy-rpc-jsonrpsee"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8eb878fc5ea95adb5abe55fb97475b3eb0dcc77dfcd6f61bd626a68ae0bdba1"
+checksum = "190e9884a69012d4abc26d1c0bc60fe01d57899ab5417c8f38105ffaaab4149b"
 dependencies = [
  "alloy-primitives",
  "jsonrpsee 0.26.0",
@@ -8373,7 +8903,26 @@ dependencies = [
  "alloy-rpc-types-eth",
  "alloy-serde",
  "derive_more 2.0.1",
- "op-alloy-consensus",
+ "op-alloy-consensus 0.20.0",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "op-alloy-rpc-types"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "274972c3c5e911b6675f6794ea0476b05e0bc1ea7e464f99ec2dc01b76d2eeb6"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-network-primitives",
+ "alloy-primitives",
+ "alloy-rpc-types-eth",
+ "alloy-serde",
+ "derive_more 2.0.1",
+ "op-alloy-consensus 0.21.0",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
@@ -8394,7 +8943,28 @@ dependencies = [
  "derive_more 2.0.1",
  "ethereum_ssz",
  "ethereum_ssz_derive",
- "op-alloy-consensus",
+ "op-alloy-consensus 0.20.0",
+ "serde",
+ "snap",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "op-alloy-rpc-types-engine"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "860edb8d5a8d54bbcdabcbd8642c45b974351ce4e10ed528dd4508eee2a43833"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-rpc-types-engine",
+ "alloy-serde",
+ "derive_more 2.0.1",
+ "ethereum_ssz",
+ "ethereum_ssz_derive",
+ "op-alloy-consensus 0.21.0",
  "serde",
  "snap",
  "thiserror 2.0.17",
@@ -8407,7 +8977,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9ba4f4693811e73449193c8bd656d3978f265871916882e6a51a487e4f96217"
 dependencies = [
  "auto_impl",
- "revm",
+ "revm 29.0.1",
+ "serde",
+]
+
+[[package]]
+name = "op-revm"
+version = "11.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a33ab6a7bbcfffcbf784de78f14593b6389003f5c69653fcffcc163459a37d69"
+dependencies = [
+ "auto_impl",
+ "revm 30.2.0",
  "serde",
 ]
 
@@ -8437,12 +9018,12 @@ dependencies = [
  "async-trait",
  "hana-celestia",
  "hana-oracle",
- "kona-derive",
- "kona-driver",
- "kona-executor",
- "kona-genesis",
- "kona-preimage",
- "kona-proof",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "op-succinct-client-utils",
  "spin 0.10.0",
 ]
@@ -8462,8 +9043,8 @@ dependencies = [
  "hana-blobstream",
  "hana-host",
  "hana-oracle",
- "kona-preimage",
- "kona-proof",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "kona-rpc",
  "op-succinct-celestia-client-utils",
  "op-succinct-client-utils",
@@ -8482,26 +9063,26 @@ version = "3.3.0"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
- "alloy-op-evm",
+ "alloy-evm 0.21.2",
+ "alloy-op-evm 0.21.2",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-sol-types",
  "anyhow",
  "async-trait",
  "cfg-if",
- "kona-derive",
- "kona-driver",
- "kona-executor",
- "kona-genesis",
- "kona-preimage",
- "kona-proof",
- "kona-protocol",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "kzg-rs",
- "op-alloy-consensus",
- "op-revm",
- "revm",
- "revm-precompile",
+ "op-alloy-consensus 0.20.0",
+ "op-revm 10.1.0",
+ "revm 29.0.1",
+ "revm-precompile 27.0.0",
  "rkyv",
  "serde",
  "serde_json",
@@ -8519,12 +9100,12 @@ dependencies = [
  "hokulea-eigenda",
  "hokulea-proof",
  "hokulea-witgen",
- "kona-derive",
- "kona-driver",
- "kona-executor",
- "kona-genesis",
- "kona-preimage",
- "kona-proof",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "op-succinct-client-utils",
  "serde_cbor",
  "spin 0.10.0",
@@ -8544,8 +9125,8 @@ dependencies = [
  "hokulea-host-bin",
  "hokulea-proof",
  "hokulea-witgen",
- "kona-preimage",
- "kona-proof",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "op-succinct-client-utils",
  "op-succinct-eigenda-client-utils",
  "op-succinct-host-utils",
@@ -8566,12 +9147,12 @@ version = "3.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "kona-derive",
- "kona-driver",
- "kona-executor",
- "kona-genesis",
- "kona-preimage",
- "kona-proof",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-driver 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-executor 0.4.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "op-succinct-client-utils",
  "spin 0.10.0",
 ]
@@ -8584,10 +9165,10 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "async-trait",
- "kona-derive",
- "kona-host",
- "kona-preimage",
- "kona-proof",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-host 1.0.2 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "op-succinct-client-utils",
  "op-succinct-ethereum-client-utils",
  "op-succinct-host-utils",
@@ -8618,8 +9199,8 @@ dependencies = [
  "dotenv",
  "hex",
  "lazy_static",
- "op-alloy-network",
- "op-alloy-rpc-types",
+ "op-alloy-network 0.20.0",
+ "op-alloy-rpc-types 0.20.0",
  "op-succinct-bindings",
  "op-succinct-client-utils",
  "op-succinct-elfs",
@@ -8658,13 +9239,13 @@ dependencies = [
  "futures",
  "hana-host",
  "hokulea-host-bin",
- "kona-derive",
- "kona-genesis",
- "kona-host",
- "kona-preimage",
- "kona-proof",
- "kona-protocol",
- "kona-registry",
+ "kona-derive 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-genesis 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-host 1.0.2 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-preimage 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-protocol 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
+ "kona-registry 0.4.5 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "kona-rpc",
  "kzg-rs",
  "lazy_static",
@@ -8672,8 +9253,8 @@ dependencies = [
  "metrics-exporter-prometheus 0.16.2",
  "metrics-process",
  "num-format",
- "op-alloy-consensus",
- "op-alloy-network",
+ "op-alloy-consensus 0.20.0",
+ "op-alloy-network 0.20.0",
  "op-succinct-client-utils",
  "op-succinct-elfs",
  "opentelemetry 0.23.0",
@@ -8737,7 +9318,7 @@ name = "op-succinct-range-utils"
 version = "3.3.0"
 dependencies = [
  "anyhow",
- "kona-proof",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "op-succinct-client-utils",
  "rkyv",
  "sp1-zkvm",
@@ -9493,8 +10074,19 @@ version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd6780a80ae0c52cc120a26a1a42c1ae51b247a253e4e06113d23d2c2edd078"
 dependencies = [
- "phf_macros",
- "phf_shared",
+ "phf_macros 0.11.3",
+ "phf_shared 0.11.3",
+ "serde",
+]
+
+[[package]]
+name = "phf"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1562dc717473dbaa4c1f85a36410e03c047b2e7df7f45ee938fbef64ae7fadf"
+dependencies = [
+ "phf_macros 0.13.1",
+ "phf_shared 0.13.1",
  "serde",
 ]
 
@@ -9504,8 +10096,18 @@ version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c80231409c20246a13fddb31776fb942c38553c51e871f8cbd687a4cfb5843d"
 dependencies = [
- "phf_shared",
+ "phf_shared 0.11.3",
  "rand 0.8.5",
+]
+
+[[package]]
+name = "phf_generator"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "135ace3a761e564ec88c03a77317a7c6b80bb7f7135ef2544dbe054243b89737"
+dependencies = [
+ "fastrand",
+ "phf_shared 0.13.1",
 ]
 
 [[package]]
@@ -9514,8 +10116,21 @@ version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f84ac04429c13a7ff43785d75ad27569f2951ce0ffd30a3321230db2fc727216"
 dependencies = [
- "phf_generator",
- "phf_shared",
+ "phf_generator 0.11.3",
+ "phf_shared 0.11.3",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.106",
+]
+
+[[package]]
+name = "phf_macros"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "812f032b54b1e759ccd5f8b6677695d5268c588701effba24601f6932f8269ef"
+dependencies = [
+ "phf_generator 0.13.1",
+ "phf_shared 0.13.1",
  "proc-macro2",
  "quote",
  "syn 2.0.106",
@@ -9526,6 +10141,15 @@ name = "phf_shared"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
+dependencies = [
+ "siphasher",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266"
 dependencies = [
  "siphasher",
 ]
@@ -10232,7 +10856,7 @@ dependencies = [
 name = "range"
 version = "3.3.0"
 dependencies = [
- "kona-proof",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "op-succinct-client-utils",
  "op-succinct-ethereum-client-utils",
  "op-succinct-range-utils",
@@ -10245,7 +10869,7 @@ dependencies = [
 name = "range-celestia"
 version = "3.3.0"
 dependencies = [
- "kona-proof",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "op-succinct-celestia-client-utils",
  "op-succinct-client-utils",
  "op-succinct-range-utils",
@@ -10262,7 +10886,7 @@ dependencies = [
  "canoe-verifier-address-fetcher",
  "hokulea-proof",
  "hokulea-zkvm-verification",
- "kona-proof",
+ "kona-proof 0.3.0 (git+https://github.com/op-rs/kona?rev=4fd947153c8dc99c1a28b463b880bd2135ece467)",
  "op-succinct-client-utils",
  "op-succinct-eigenda-client-utils",
  "op-succinct-range-utils",
@@ -10555,7 +11179,7 @@ dependencies = [
  "alloy-chains",
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "alloy-genesis",
  "alloy-primitives",
  "alloy-trie",
@@ -10579,7 +11203,7 @@ dependencies = [
  "alloy-trie",
  "bytes",
  "modular-bitfield",
- "op-alloy-consensus",
+ "op-alloy-consensus 0.20.0",
  "reth-codecs-derive",
  "reth-zstd-compressors",
  "serde",
@@ -10698,7 +11322,7 @@ source = "git+https://github.com/paradigmxyz/reth?tag=v1.8.2#9c30bf7af5e0d45deaf
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "alloy-primitives",
  "auto_impl",
  "derive_more 2.0.1",
@@ -10709,7 +11333,7 @@ dependencies = [
  "reth-storage-api",
  "reth-storage-errors",
  "reth-trie-common",
- "revm",
+ "revm 29.0.1",
 ]
 
 [[package]]
@@ -10719,7 +11343,7 @@ source = "git+https://github.com/paradigmxyz/reth?tag=v1.8.2#9c30bf7af5e0d45deaf
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "alloy-primitives",
  "alloy-rpc-types-engine",
  "derive_more 2.0.1",
@@ -10730,7 +11354,7 @@ dependencies = [
  "reth-execution-types",
  "reth-primitives-traits",
  "reth-storage-errors",
- "revm",
+ "revm 29.0.1",
 ]
 
 [[package]]
@@ -10738,7 +11362,7 @@ name = "reth-execution-errors"
 version = "1.8.2"
 source = "git+https://github.com/paradigmxyz/reth?tag=v1.8.2#9c30bf7af5e0d45deaf5917375c9922c16654b28"
 dependencies = [
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "alloy-primitives",
  "alloy-rlp",
  "nybbles",
@@ -10753,13 +11377,13 @@ source = "git+https://github.com/paradigmxyz/reth?tag=v1.8.2#9c30bf7af5e0d45deaf
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "alloy-primitives",
  "derive_more 2.0.1",
  "reth-ethereum-primitives",
  "reth-primitives-traits",
  "reth-trie-common",
- "revm",
+ "revm 29.0.1",
  "serde",
  "serde_with",
 ]
@@ -10806,11 +11430,11 @@ dependencies = [
  "bytes",
  "derive_more 2.0.1",
  "once_cell",
- "op-alloy-consensus",
+ "op-alloy-consensus 0.20.0",
  "reth-codecs",
- "revm-bytecode",
- "revm-primitives",
- "revm-state",
+ "revm-bytecode 6.2.2",
+ "revm-primitives 20.2.1",
+ "revm-state 7.0.5",
  "secp256k1 0.30.0",
  "serde",
  "serde_with",
@@ -10869,7 +11493,7 @@ dependencies = [
  "reth-stages-types",
  "reth-storage-errors",
  "reth-trie-common",
- "revm-database",
+ "revm-database 7.0.5",
 ]
 
 [[package]]
@@ -10884,7 +11508,7 @@ dependencies = [
  "reth-primitives-traits",
  "reth-prune-types",
  "reth-static-file-types",
- "revm-database-interface",
+ "revm-database-interface 7.0.5",
  "thiserror 2.0.17",
 ]
 
@@ -10906,7 +11530,7 @@ dependencies = [
  "reth-storage-errors",
  "reth-trie-common",
  "reth-trie-sparse",
- "revm-database",
+ "revm-database 7.0.5",
  "tracing",
 ]
 
@@ -10927,7 +11551,7 @@ dependencies = [
  "nybbles",
  "rayon",
  "reth-primitives-traits",
- "revm-database",
+ "revm-database 7.0.5",
  "serde",
  "serde_with",
 ]
@@ -10962,17 +11586,36 @@ version = "29.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "718d90dce5f07e115d0e66450b1b8aa29694c1cf3f89ebddaddccc2ccbd2f13e"
 dependencies = [
- "revm-bytecode",
- "revm-context",
- "revm-context-interface",
- "revm-database",
- "revm-database-interface",
- "revm-handler",
- "revm-inspector",
- "revm-interpreter",
- "revm-precompile",
- "revm-primitives",
- "revm-state",
+ "revm-bytecode 6.2.2",
+ "revm-context 9.1.0",
+ "revm-context-interface 10.2.0",
+ "revm-database 7.0.5",
+ "revm-database-interface 7.0.5",
+ "revm-handler 10.0.1",
+ "revm-inspector 10.0.1",
+ "revm-interpreter 25.0.3",
+ "revm-precompile 27.0.0",
+ "revm-primitives 20.2.1",
+ "revm-state 7.0.5",
+]
+
+[[package]]
+name = "revm"
+version = "30.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76df793c6ef3bef8f88f05b3873ebebce1494385a3ce8f58ad2e2e111aa0de11"
+dependencies = [
+ "revm-bytecode 7.0.2",
+ "revm-context 10.1.2",
+ "revm-context-interface 11.1.2",
+ "revm-database 9.0.2",
+ "revm-database-interface 8.0.3",
+ "revm-handler 11.2.0",
+ "revm-inspector 11.2.0",
+ "revm-interpreter 28.0.0",
+ "revm-precompile 28.1.1",
+ "revm-primitives 21.0.1",
+ "revm-state 8.0.2",
 ]
 
 [[package]]
@@ -10982,8 +11625,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66c52031b73cae95d84cd1b07725808b5fd1500da3e5e24574a3b2dc13d9f16d"
 dependencies = [
  "bitvec",
- "phf",
- "revm-primitives",
+ "phf 0.11.3",
+ "revm-primitives 20.2.1",
+ "serde",
+]
+
+[[package]]
+name = "revm-bytecode"
+version = "7.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "451748b17ac78bd2b0748ec472a5392cd78fc0f7d19d528be44770fda28fd6f7"
+dependencies = [
+ "bitvec",
+ "phf 0.13.1",
+ "revm-primitives 21.0.1",
  "serde",
 ]
 
@@ -10996,11 +11651,28 @@ dependencies = [
  "bitvec",
  "cfg-if",
  "derive-where",
- "revm-bytecode",
- "revm-context-interface",
- "revm-database-interface",
- "revm-primitives",
- "revm-state",
+ "revm-bytecode 6.2.2",
+ "revm-context-interface 10.2.0",
+ "revm-database-interface 7.0.5",
+ "revm-primitives 20.2.1",
+ "revm-state 7.0.5",
+ "serde",
+]
+
+[[package]]
+name = "revm-context"
+version = "10.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7adcce0c14cf59b7128de34185a0fbf8f63309539b9263b35ead870d73584114"
+dependencies = [
+ "bitvec",
+ "cfg-if",
+ "derive-where",
+ "revm-bytecode 7.0.2",
+ "revm-context-interface 11.1.2",
+ "revm-database-interface 8.0.3",
+ "revm-primitives 21.0.1",
+ "revm-state 8.0.2",
  "serde",
 ]
 
@@ -11014,9 +11686,25 @@ dependencies = [
  "alloy-eip7702",
  "auto_impl",
  "either",
- "revm-database-interface",
- "revm-primitives",
- "revm-state",
+ "revm-database-interface 7.0.5",
+ "revm-primitives 20.2.1",
+ "revm-state 7.0.5",
+ "serde",
+]
+
+[[package]]
+name = "revm-context-interface"
+version = "11.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d620a9725e443c171fb195a074331fa4a745fa5cbb0018b4bbf42619e64b563"
+dependencies = [
+ "alloy-eip2930",
+ "alloy-eip7702",
+ "auto_impl",
+ "either",
+ "revm-database-interface 8.0.3",
+ "revm-primitives 21.0.1",
+ "revm-state 8.0.2",
  "serde",
 ]
 
@@ -11027,10 +11715,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39a276ed142b4718dcf64bc9624f474373ed82ef20611025045c3fb23edbef9c"
 dependencies = [
  "alloy-eips",
- "revm-bytecode",
- "revm-database-interface",
- "revm-primitives",
- "revm-state",
+ "revm-bytecode 6.2.2",
+ "revm-database-interface 7.0.5",
+ "revm-primitives 20.2.1",
+ "revm-state 7.0.5",
+ "serde",
+]
+
+[[package]]
+name = "revm-database"
+version = "9.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdefd7f40835e992bab40a245124cb1243e6c7a1c4659798827c809a59b0fea9"
+dependencies = [
+ "alloy-eips",
+ "revm-bytecode 7.0.2",
+ "revm-database-interface 8.0.3",
+ "revm-primitives 21.0.1",
+ "revm-state 8.0.2",
  "serde",
 ]
 
@@ -11042,8 +11744,21 @@ checksum = "8c523c77e74eeedbac5d6f7c092e3851dbe9c7fec6f418b85992bd79229db361"
 dependencies = [
  "auto_impl",
  "either",
- "revm-primitives",
- "revm-state",
+ "revm-primitives 20.2.1",
+ "revm-state 7.0.5",
+ "serde",
+]
+
+[[package]]
+name = "revm-database-interface"
+version = "8.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa488a73ac2738f11478650cdf1a0f263864c09d5f0e9bf6309e891a05323c60"
+dependencies = [
+ "auto_impl",
+ "either",
+ "revm-primitives 21.0.1",
+ "revm-state 8.0.2",
  "serde",
 ]
 
@@ -11055,14 +11770,33 @@ checksum = "550331ea85c1d257686e672081576172fe3d5a10526248b663bbf54f1bef226a"
 dependencies = [
  "auto_impl",
  "derive-where",
- "revm-bytecode",
- "revm-context",
- "revm-context-interface",
- "revm-database-interface",
- "revm-interpreter",
- "revm-precompile",
- "revm-primitives",
- "revm-state",
+ "revm-bytecode 6.2.2",
+ "revm-context 9.1.0",
+ "revm-context-interface 10.2.0",
+ "revm-database-interface 7.0.5",
+ "revm-interpreter 25.0.3",
+ "revm-precompile 27.0.0",
+ "revm-primitives 20.2.1",
+ "revm-state 7.0.5",
+ "serde",
+]
+
+[[package]]
+name = "revm-handler"
+version = "11.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1d8049b2fbff6636150f4740c95369aa174e41b0383034e0e256cfdffcfcd23"
+dependencies = [
+ "auto_impl",
+ "derive-where",
+ "revm-bytecode 7.0.2",
+ "revm-context 10.1.2",
+ "revm-context-interface 11.1.2",
+ "revm-database-interface 8.0.3",
+ "revm-interpreter 28.0.0",
+ "revm-precompile 28.1.1",
+ "revm-primitives 21.0.1",
+ "revm-state 8.0.2",
  "serde",
 ]
 
@@ -11074,12 +11808,30 @@ checksum = "7c0a6e9ccc2ae006f5bed8bd80cd6f8d3832cd55c5e861b9402fdd556098512f"
 dependencies = [
  "auto_impl",
  "either",
- "revm-context",
- "revm-database-interface",
- "revm-handler",
- "revm-interpreter",
- "revm-primitives",
- "revm-state",
+ "revm-context 9.1.0",
+ "revm-database-interface 7.0.5",
+ "revm-handler 10.0.1",
+ "revm-interpreter 25.0.3",
+ "revm-primitives 20.2.1",
+ "revm-state 7.0.5",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "revm-inspector"
+version = "11.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2a21dd773b654ec7e080025eecef4ac84c711150d1bd36acadf0546f471329a"
+dependencies = [
+ "auto_impl",
+ "either",
+ "revm-context 10.1.2",
+ "revm-database-interface 8.0.3",
+ "revm-handler 11.2.0",
+ "revm-interpreter 28.0.0",
+ "revm-primitives 21.0.1",
+ "revm-state 8.0.2",
  "serde",
  "serde_json",
 ]
@@ -11090,9 +11842,22 @@ version = "25.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06575dc51b1d8f5091daa12a435733a90b4a132dca7ccee0666c7db3851bc30c"
 dependencies = [
- "revm-bytecode",
- "revm-context-interface",
- "revm-primitives",
+ "revm-bytecode 6.2.2",
+ "revm-context-interface 10.2.0",
+ "revm-primitives 20.2.1",
+ "serde",
+]
+
+[[package]]
+name = "revm-interpreter"
+version = "28.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1de5c790122f8ded67992312af8acd41ccfcee629b25b819e10c5b1f69caf57"
+dependencies = [
+ "revm-bytecode 7.0.2",
+ "revm-context-interface 11.1.2",
+ "revm-primitives 21.0.1",
+ "revm-state 8.0.2",
  "serde",
 ]
 
@@ -11116,12 +11881,37 @@ dependencies = [
  "kzg-rs",
  "libsecp256k1",
  "p256",
- "revm-primitives",
+ "revm-primitives 20.2.1",
  "ripemd",
  "rug",
  "secp256k1 0.31.1",
  "sha2 0.10.9",
  "substrate-bn",
+]
+
+[[package]]
+name = "revm-precompile"
+version = "28.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e57aadd7a2087705f653b5aaacc8ad4f8e851f5d330661e3f4c43b5475bbceae"
+dependencies = [
+ "ark-bls12-381",
+ "ark-bn254",
+ "ark-ec",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
+ "arrayref",
+ "aurora-engine-modexp",
+ "blst",
+ "c-kzg",
+ "cfg-if",
+ "k256 0.13.4",
+ "p256",
+ "revm-primitives 21.0.1",
+ "ripemd",
+ "rug",
+ "secp256k1 0.31.1",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -11137,14 +11927,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "revm-primitives"
+version = "21.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "536f30e24c3c2bf0d3d7d20fa9cf99b93040ed0f021fd9301c78cddb0dacda13"
+dependencies = [
+ "alloy-primitives",
+ "num_enum 0.7.4",
+ "once_cell",
+ "serde",
+]
+
+[[package]]
 name = "revm-state"
 version = "7.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f64fbacb86008394aaebd3454f9643b7d5a782bd251135e17c5b33da592d84d"
 dependencies = [
  "bitflags 2.9.4",
- "revm-bytecode",
- "revm-primitives",
+ "revm-bytecode 6.2.2",
+ "revm-primitives 20.2.1",
+ "serde",
+]
+
+[[package]]
+name = "revm-state"
+version = "8.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e6bd5e669b02007872a8ca2643a14e308fe1739ee4475d74122587c3388a06a"
+dependencies = [
+ "bitflags 2.9.4",
+ "revm-bytecode 7.0.2",
+ "revm-primitives 21.0.1",
  "serde",
 ]
 
@@ -11305,7 +12119,7 @@ version = "0.1.0"
 source = "git+https://github.com/succinctlabs/rsp?tag=reth-1.8.2#e39d5fea281ed5e22dd5d572e02b650699af97ec"
 dependencies = [
  "alloy-consensus",
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "alloy-network",
  "alloy-primitives",
  "alloy-rpc-types",
@@ -11321,8 +12135,8 @@ dependencies = [
  "reth-execution-types",
  "reth-primitives-traits",
  "reth-trie",
- "revm",
- "revm-primitives",
+ "revm 29.0.1",
+ "revm-primitives 20.2.1",
  "rsp-mpt",
  "rsp-primitives 0.1.0 (git+https://github.com/succinctlabs/rsp?tag=reth-1.8.2)",
  "serde",
@@ -11397,10 +12211,10 @@ dependencies = [
  "alloy-trie",
  "async-trait",
  "reth-storage-errors",
- "revm-database",
- "revm-database-interface",
- "revm-primitives",
- "revm-state",
+ "revm-database 7.0.5",
+ "revm-database-interface 7.0.5",
+ "revm-primitives 20.2.1",
+ "revm-state 7.0.5",
  "rsp-mpt",
  "rsp-primitives 0.1.0 (git+https://github.com/succinctlabs/rsp?tag=reth-1.8.2)",
  "thiserror 1.0.69",
@@ -11415,9 +12229,9 @@ source = "git+https://github.com/succinctlabs/rsp?tag=reth-1.8.2#e39d5fea281ed5e
 dependencies = [
  "alloy-primitives",
  "reth-storage-errors",
- "revm-database-interface",
- "revm-primitives",
- "revm-state",
+ "revm-database-interface 7.0.5",
+ "revm-primitives 20.2.1",
+ "revm-state 7.0.5",
  "serde",
 ]
 
@@ -12472,7 +13286,7 @@ source = "git+https://github.com/succinctlabs/sp1-contract-call.git?rev=dad9b9ce
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "alloy-primitives",
  "alloy-rpc-types",
  "alloy-rpc-types-eth",
@@ -12486,8 +13300,8 @@ dependencies = [
  "reth-evm",
  "reth-evm-ethereum",
  "reth-primitives",
- "revm",
- "revm-primitives",
+ "revm 29.0.1",
+ "revm-primitives 20.2.1",
  "rsp-client-executor",
  "rsp-mpt",
  "rsp-primitives 0.1.0 (git+https://github.com/succinctlabs/rsp?tag=reth-1.8.2)",
@@ -12506,7 +13320,7 @@ source = "git+https://github.com/succinctlabs/sp1-contract-call.git?rev=dad9b9ce
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
- "alloy-evm",
+ "alloy-evm 0.21.2",
  "alloy-primitives",
  "alloy-provider",
  "alloy-rpc-types",
@@ -12519,8 +13333,8 @@ dependencies = [
  "reqwest 0.12.23",
  "reth-chainspec",
  "reth-primitives",
- "revm",
- "revm-primitives",
+ "revm 29.0.1",
+ "revm-primitives 20.2.1",
  "rsp-client-executor",
  "rsp-mpt",
  "rsp-primitives 0.1.0 (git+https://github.com/succinctlabs/rsp?tag=reth-1.8.2)",
