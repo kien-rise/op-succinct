@@ -22,7 +22,6 @@ fn build_env_filter() -> EnvFilter {
         .add_directive("sp1_prover=error".parse().unwrap())
         .add_directive("boot_loader=error".parse().unwrap())
         .add_directive("client_executor=error".parse().unwrap())
-        .add_directive("client=error".parse().unwrap())
         .add_directive("channel_assembler=error".parse().unwrap())
         .add_directive("attributes_queue=error".parse().unwrap())
         .add_directive("batch_validator=error".parse().unwrap())

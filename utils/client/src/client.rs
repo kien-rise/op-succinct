@@ -124,7 +124,7 @@ where
         tracing::debug!("SC: Executing payload with timestamp: {}", attributes.payload_attributes.timestamp);
         let outcome = match driver.executor.execute_payload(attributes.clone()).await {
             Ok(outcome) => {
-                tracing::debug!("SC: Successfully executed payload, outcome header hash: {:?}", outcome.header.hash());
+                tracing::debug!("SC: Successfully executed payload, outcome header: {:?}", outcome.header);
                 outcome
             },
             Err(e) => {
