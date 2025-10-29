@@ -596,13 +596,27 @@ impl OPSuccinctDataFetcher {
     }
 
     pub async fn l2_block_info_by_number(&self, block_number: u64) -> Result<L2BlockInfo> {
+        tracing::info!("Starting l2_block_info_by_number for block_number: {}", block_number);
+
         // If the rollup config is not already loaded, fetch and save it.
         if self.rollup_config.is_none() {
+            tracing::error!("Rollup config not loaded for block_number: {}", block_number);
             return Err(anyhow::anyhow!("Rollup config not loaded."));
         }
+        tracing::debug!("Rollup config loaded for block_number: {}", block_number);
+
         let genesis = self.rollup_config.as_ref().unwrap().genesis;
+        tracing::debug!("Genesis config retrieved for block_number: {}, genesis: {:?}", block_number, genesis);
+
+        tracing::debug!("Fetching L2 block for block_number: {}", block_number);
         let block = self.get_l2_block_by_number(block_number).await?;
-        Ok(L2BlockInfo::from_block_and_genesis(&block, &genesis)?)
+        tracing::debug!("Successfully fetched L2 block for block_number: {}, block hash: {:?}", block_number, block.header.hash_slow());
+
+        tracing::debug!("Converting block to L2BlockInfo for block_number: {}", block_number);
+        let block_info = L2BlockInfo::from_block_and_genesis(&block, &genesis)?;
+        tracing::info!("Successfully created L2BlockInfo for block_number: {}, block_info: {:?}", block_number, block_info);
+
+        Ok(block_info)
     }
 
     /// Get the L2 safe head corresponding to the L1 block number using optimism_safeHeadAtL1Block.
