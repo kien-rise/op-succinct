@@ -58,86 +58,120 @@ where
     DP: DriverPipeline<P> + Send + Sync + Debug,
     P: Pipeline + SignalReceiver + Send + Sync + Debug,
 {
+    info!(target: "client", "SC: Starting advance_to_target with target: {:?}", target);
+
     loop {
         // Check if we have reached the target block number.
         let pipeline_cursor = driver.cursor.read();
         let tip_cursor = pipeline_cursor.tip();
+        tracing::debug!(target: "client", "SC: Current L2 safe head block number: {}", tip_cursor.l2_safe_head.block_info.number);
+
         if let Some(tb) = target {
+            tracing::debug!(target: "client", "SC: Checking if current block {} >= target block {}", tip_cursor.l2_safe_head.block_info.number, tb);
             if tip_cursor.l2_safe_head.block_info.number >= tb {
-                info!(target: "client", "Derivation complete, reached L2 safe head.");
+                info!(target: "client", "SC: Derivation complete, reached L2 safe head. Current: {}, Target: {}", tip_cursor.l2_safe_head.block_info.number, tb);
                 return Ok((tip_cursor.l2_safe_head, tip_cursor.l2_safe_head_output_root));
             }
+        } else {
+            tracing::debug!(target: "client", "SC: No target specified, continuing derivation");
         }
 
         #[cfg(target_os = "zkvm")]
         println!("cycle-tracker-report-start: payload-derivation");
+        tracing::debug!(target: "client", "SC: Producing payload for L2 safe head: {}", tip_cursor.l2_safe_head.block_info.number);
         let mut attributes = match driver.pipeline.produce_payload(tip_cursor.l2_safe_head).await {
-            Ok(attrs) => attrs.take_inner(),
+            Ok(attrs) => {
+                tracing::debug!(target: "client", "SC: Successfully produced payload attributes");
+                attrs.take_inner()
+            },
             Err(PipelineErrorKind::Critical(PipelineError::EndOfSource)) => {
-                warn!(target: "client", "Exhausted data source; Halting derivation and using current safe head.");
+                warn!(target: "client", "SC: Exhausted data source; Halting derivation and using current safe head.");
 
                 // Adjust the target block number to the current safe head, as no more blocks
                 // can be produced.
                 if target.is_some() {
+                    info!(target: "client", "SC: Adjusting target from {:?} to current safe head: {}", target, tip_cursor.l2_safe_head.block_info.number);
                     target = Some(tip_cursor.l2_safe_head.block_info.number);
                 };
 
                 // If we are in interop mode, this error must be handled by the caller.
                 // Otherwise, we continue the loop to halt derivation on the next iteration.
-                if cfg.is_interop_active(driver.cursor.read().l2_safe_head().block_info.number) {
+                let current_block = driver.cursor.read().l2_safe_head().block_info.number;
+                let is_interop_active = cfg.is_interop_active(current_block);
+                tracing::debug!(target: "client", "SC: Interop active for block {}: {}", current_block, is_interop_active);
+                if is_interop_active {
+                    error!(target: "client", "SC: EndOfSource error in interop mode, returning error");
                     return Err(PipelineError::EndOfSource.crit().into());
                 } else {
+                    tracing::debug!(target: "client", "SC: Continuing loop to halt derivation");
                     continue;
                 }
             }
             Err(e) => {
-                error!(target: "client", "Failed to produce payload: {:?}", e);
+                error!(target: "client", "SC: Failed to produce payload: {:?}", e);
                 return Err(DriverError::Pipeline(e));
             }
         };
         #[cfg(target_os = "zkvm")]
         println!("cycle-tracker-report-end: payload-derivation");
 
+        tracing::debug!(target: "client", "SC: Updating executor safe head to: {:?}", tip_cursor.l2_safe_head_header.hash_slow());
         driver.executor.update_safe_head(tip_cursor.l2_safe_head_header.clone());
 
         #[cfg(target_os = "zkvm")]
         println!("cycle-tracker-report-start: block-execution");
+        tracing::debug!(target: "client", "SC: Executing payload with timestamp: {}", attributes.payload_attributes.timestamp);
         let outcome = match driver.executor.execute_payload(attributes.clone()).await {
-            Ok(outcome) => outcome,
+            Ok(outcome) => {
+                tracing::debug!(target: "client", "SC: Successfully executed payload, outcome header hash: {:?}", outcome.header.hash());
+                outcome
+            },
             Err(e) => {
-                error!(target: "client", "Failed to execute L2 block: {}", e);
+                error!(target: "client", "SC: Failed to execute L2 block: {}", e);
 
-                if cfg.is_holocene_active(attributes.payload_attributes.timestamp) {
+                let is_holocene_active = cfg.is_holocene_active(attributes.payload_attributes.timestamp);
+                tracing::debug!(target: "client", "SC: Holocene active for timestamp {}: {}", attributes.payload_attributes.timestamp, is_holocene_active);
+
+                if is_holocene_active {
                     // Retry with a deposit-only block.
-                    warn!(target: "client", "Flushing current channel and retrying deposit only block");
+                    warn!(target: "client", "SC: Flushing current channel and retrying deposit only block");
 
                     // Flush the current batch and channel - if a block was replaced with a
                     // deposit-only block due to execution failure, the
                     // batch and channel it is contained in is forwards
                     // invalidated.
+                    tracing::debug!(target: "client", "SC: Sending FlushChannel signal to pipeline");
                     driver.pipeline.signal(Signal::FlushChannel).await?;
 
                     // Strip out all transactions that are not deposits.
+                    let original_tx_count = attributes.transactions.as_ref().map(|txs| txs.len()).unwrap_or(0);
                     attributes.transactions = attributes.transactions.map(|txs| {
                         txs.into_iter()
                             .filter(|tx| !tx.is_empty() && tx[0] == OpTxType::Deposit as u8)
                             .collect::<Vec<_>>()
                     });
+                    let deposit_tx_count = attributes.transactions.as_ref().map(|txs| txs.len()).unwrap_or(0);
+                    tracing::debug!(target: "client", "SC: Filtered transactions from {} to {} (deposits only)", original_tx_count, deposit_tx_count);
 
                     // Retry the execution.
+                    tracing::debug!(target: "client", "SC: Retrying execution with deposit-only block");
                     driver.executor.update_safe_head(tip_cursor.l2_safe_head_header.clone());
                     match driver.executor.execute_payload(attributes.clone()).await {
-                        Ok(header) => header,
+                        Ok(header) => {
+                            tracing::debug!(target: "client", "SC: Successfully executed deposit-only block");
+                            header
+                        },
                         Err(e) => {
                             error!(
                                 target: "client",
-                                "Critical - Failed to execute deposit-only block: {e}",
+                                "SC: Critical - Failed to execute deposit-only block: {e}",
                             );
                             return Err(DriverError::Executor(e));
                         }
                     }
                 } else {
                     // Pre-Holocene, discard the block if execution fails.
+                    tracing::debug!(target: "client", "SC: Pre-Holocene mode: discarding failed block and continuing");
                     continue;
                 }
             }
@@ -146,6 +180,10 @@ where
         println!("cycle-tracker-report-end: block-execution");
 
         // Construct the block.
+        tracing::debug!(target: "client", "SC: Constructing OpBlock from execution outcome");
+        let tx_count = attributes.transactions.as_ref().unwrap_or(&Vec::new()).len();
+        tracing::debug!(target: "client", "SC: Block will contain {} transactions", tx_count);
+
         let block = OpBlock {
             header: outcome.header.inner().clone(),
             body: BlockBody {
@@ -160,20 +198,33 @@ where
                 withdrawals: None,
             },
         };
+        tracing::debug!(target: "client", "SC: Successfully constructed block with hash: {:?}", block.header.hash_slow());
 
         // Get the pipeline origin and update the tip cursor.
+        tracing::debug!(target: "client", "SC: Getting pipeline origin and creating L2BlockInfo");
         let origin = driver.pipeline.origin().ok_or(PipelineError::MissingOrigin.crit())?;
+        tracing::debug!(target: "client", "SC: Pipeline origin: {:?}", origin);
+
         let l2_info =
             L2BlockInfo::from_block_and_genesis(&block, &driver.pipeline.rollup_config().genesis)?;
+        tracing::debug!(target: "client", "SC: Created L2BlockInfo: block_number={}, block_hash={:?}", l2_info.block_info.number, l2_info.block_info.hash);
+
+        tracing::debug!(target: "client", "SC: Computing output root");
+        let output_root = driver.executor.compute_output_root().map_err(DriverError::Executor)?;
+        tracing::debug!(target: "client", "SC: Computed output root: {:?}", output_root);
+
         let tip_cursor = TipCursor::new(
             l2_info,
             outcome.header,
-            driver.executor.compute_output_root().map_err(DriverError::Executor)?,
+            output_root,
         );
+        tracing::debug!(target: "client", "SC: Created new tip cursor for block: {}", tip_cursor.l2_safe_head.block_info.number);
 
         // Advance the derivation pipeline cursor
+        tracing::debug!(target: "client", "SC: Advancing derivation pipeline cursor");
         drop(pipeline_cursor);
         driver.cursor.write().advance(origin, tip_cursor);
+        tracing::debug!(target: "client", "SC: Successfully advanced cursor, completing iteration");
 
         // Add forget calls to save cycles
         #[cfg(target_os = "zkvm")]
