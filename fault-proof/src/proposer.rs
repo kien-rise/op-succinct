@@ -1424,6 +1424,11 @@ where
             })
         } else {
             tokio::spawn(async move {
+                tracing::info!(
+                    game_address = ?game_address,
+                    "SC: Game being proven"
+                );
+
                 let start_time = std::time::Instant::now();
                 let (tx_hash, total_instruction_cycles, total_sp1_gas) =
                     proposer.prove_game(game_address).await?;

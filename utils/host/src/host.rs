@@ -92,16 +92,28 @@ pub trait OPSuccinctHost: Send + Sync + 'static {
         &self,
         args: &Self::Args,
     ) -> Result<<Self::WitnessGenerator as WitnessGenerator>::WitnessData> {
+        tracing::info!("SC: Starting host run function");
+        
+        tracing::debug!("SC: Creating bidirectional channels for preimage and hint");
         let preimage = BidirectionalChannel::new()?;
         let hint = BidirectionalChannel::new()?;
+        tracing::debug!("SC: Successfully created bidirectional channels");
 
+        tracing::debug!("SC: Starting server task with hint and preimage channels");
         let server_task = args.start_server(hint.host, preimage.host).await?;
+        tracing::info!("SC: Server task started successfully");
 
+        tracing::debug!("SC: Running witness generator with client channels");
         let witness = self.witness_generator().run(preimage.client, hint.client).await?;
+        tracing::info!("SC: Witness generator completed successfully");
+        
         // Unlike the upstream, manually abort the server task, as it will hang if you wait for both
         // tasks to complete.
+        tracing::debug!("SC: Aborting server task to prevent hanging");
         server_task.abort();
+        tracing::debug!("SC: Server task aborted successfully");
 
+        tracing::info!("SC: Host run function completed successfully");
         Ok(witness)
     }
 

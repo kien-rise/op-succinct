@@ -152,8 +152,12 @@ pub trait WitnessExecutor {
         DP: DriverPipeline<P> + Send + Sync + Debug,
         P: Pipeline + SignalReceiver + Send + Sync + Debug,
     {
+        tracing::info!("SC: Starting witness executor run for L2 block #{}", boot.claimed_l2_block_number);
+        tracing::debug!("SC: Claimed L2 output root: {:?}", boot.claimed_l2_output_root);
+        
         let boot_clone = boot.clone();
 
+        tracing::debug!("SC: Creating rollup config and Kona executor");
         let rollup_config = Arc::new(boot.rollup_config);
 
         let executor = KonaExecutor::new(
@@ -164,12 +168,15 @@ pub trait WitnessExecutor {
             None,
         );
         let mut driver = Driver::new(cursor, executor, pipeline);
+        tracing::debug!("SC: Successfully created driver with Kona executor");
         // Run the derivation pipeline until we are able to produce the output root of the claimed
         // L2 block.
+        tracing::info!("SC: Starting derivation pipeline to produce output root for L2 block #{}", boot.claimed_l2_block_number);
 
         // Use custom advance to target with cycle tracking.
         #[cfg(target_os = "zkvm")]
         println!("cycle-tracker-report-start: block-execution-and-derivation");
+        tracing::debug!("SC: Advancing to target block #{}", boot.claimed_l2_block_number);
         let (safe_head, output_root) = advance_to_target(
             &mut driver,
             rollup_config.as_ref(),
@@ -178,12 +185,16 @@ pub trait WitnessExecutor {
         .await?;
         #[cfg(target_os = "zkvm")]
         println!("cycle-tracker-report-end: block-execution-and-derivation");
+        tracing::info!("SC: Successfully advanced to target block #{}, produced output root: {:?}", safe_head.block_info.number, output_root);
 
         ////////////////////////////////////////////////////////////////
         //                          EPILOGUE                          //
         ////////////////////////////////////////////////////////////////
 
+        tracing::debug!("SC: Validating output root - claimed: {:?}, computed: {:?}", boot.claimed_l2_output_root, output_root);
         if output_root != boot.claimed_l2_output_root {
+            tracing::error!("SC: Output root validation failed! Block #{}, claimed: {:?}, computed: {:?}", 
+                safe_head.block_info.number, boot.claimed_l2_output_root, output_root);
             return Err(anyhow!(
             "Failed to validate L2 block #{number} with claimed output root {claimed_output_root}. Got {output_root} instead",
             number = safe_head.block_info.number,
@@ -192,19 +203,20 @@ pub trait WitnessExecutor {
         ));
         }
 
-        info!(
-            target: "client",
-            "Successfully validated L2 block #{number} with output root {output_root}",
+        tracing::info!(
+            "SC: Successfully validated L2 block #{number} with output root {output_root}",
             number = safe_head.block_info.number,
             output_root = output_root
         );
 
         #[cfg(target_os = "zkvm")]
         {
+            tracing::debug!("SC: Forgetting driver and rollup_config to save memory in zkVM");
             std::mem::forget(driver);
             std::mem::forget(rollup_config);
         }
 
+        tracing::info!("SC: Witness executor run completed successfully");
         Ok(boot_clone)
     }
 }

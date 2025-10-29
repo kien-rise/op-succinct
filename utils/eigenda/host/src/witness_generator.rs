@@ -85,16 +85,22 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         preimage_chan: NativeChannel,
         hint_chan: NativeChannel,
     ) -> Result<Self::WitnessData> {
+        tracing::info!("SC: Starting EigenDA witness generator run");
+        
+        tracing::debug!("SC: Initializing preimage witness store and blob data");
         let preimage_witness_store = Arc::new(std::sync::Mutex::new(PreimageStore::default()));
         let blob_data = Arc::new(std::sync::Mutex::new(BlobData::default()));
 
+        tracing::debug!("SC: Creating caching oracle with preimage and hint channels");
         let preimage_oracle = Arc::new(kona_proof::CachingOracle::new(
             2048,
             OracleReader::new(preimage_chan),
             HintWriter::new(hint_chan),
         ));
         let blob_provider = OracleBlobProvider::new(preimage_oracle.clone());
+        tracing::debug!("SC: Successfully created oracle and blob provider");
 
+        tracing::debug!("SC: Creating preimage witness collector and blob store");
         let oracle = Arc::new(PreimageWitnessCollector {
             preimage_oracle: preimage_oracle.clone(),
             preimage_witness_store: preimage_witness_store.clone(),
@@ -102,6 +108,7 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         let beacon = OnlineBlobStore { provider: blob_provider.clone(), store: blob_data.clone() };
 
         // Create EigenDA blob provider that collects witness data
+        tracing::debug!("SC: Setting up EigenDA providers and witness collection");
         let eigenda_preimage_provider = OracleEigenDAPreimageProvider::new(oracle.clone());
         let eigenda_witness = Arc::new(Mutex::new(EigenDAWitness::default()));
 
@@ -111,11 +118,18 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         };
 
         let executor = EigenDAWitnessExecutor::new(eigenda_blob_and_witness_provider);
+        tracing::debug!("SC: Successfully created EigenDA witness executor");
 
+        tracing::info!("SC: Getting inputs for pipeline");
         let (boot_info, input) = get_inputs_for_pipeline(oracle.clone()).await.unwrap();
+        tracing::debug!("SC: Successfully retrieved boot info and pipeline inputs");
+        
         if let Some((cursor, l1_provider, l2_provider)) = input {
+            tracing::info!("SC: Pipeline inputs available, creating and running pipeline");
             let rollup_config = Arc::new(boot_info.rollup_config.clone());
             let l1_config = Arc::new(boot_info.l1_config.clone());
+            
+            tracing::debug!("SC: Creating witness executor pipeline");
             let pipeline = WitnessExecutorTrait::create_pipeline(
                 &executor,
                 rollup_config,
@@ -128,15 +142,23 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             )
             .await
             .unwrap();
+            tracing::info!("SC: Successfully created pipeline, starting execution");
+            
             WitnessExecutorTrait::run(&executor, boot_info.clone(), pipeline, cursor, l2_provider)
                 .await
                 .unwrap();
+            tracing::info!("SC: Pipeline execution completed successfully");
+        } else {
+            tracing::warn!("SC: No pipeline inputs available, skipping pipeline execution");
         }
 
         // Extract the EigenDA witness data
+        tracing::debug!("SC: Extracting EigenDA witness data");
         let mut eigenda_witness_data = std::mem::take(&mut *eigenda_witness.lock().unwrap());
+        tracing::debug!("SC: Successfully extracted EigenDA witness data");
 
         // Generate canoe proofs using the reduced proof provider for proof aggregation
+        tracing::info!("SC: Starting canoe proof generation");
         use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
         let eth_rpc_url = std::env::var("L1_RPC")
             .map_err(|_| anyhow::anyhow!("L1_RPC environment variable not set"))?;
@@ -144,7 +166,10 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             .unwrap_or("false".to_string())
             .parse::<bool>()
             .unwrap_or(false);
+        tracing::debug!("SC: Canoe provider config - eth_rpc_url: {}, mock_mode: {}", eth_rpc_url, mock_mode);
+        
         let canoe_provider = CanoeSp1CCReducedProofProvider { eth_rpc_url, mock_mode };
+        tracing::debug!("SC: Generating canoe proof from boot info");
         let canoe_proofs = hokulea_witgen::from_boot_info_to_canoe_proof(
             &boot_info,
             &eigenda_witness_data,
@@ -153,23 +178,32 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             CanoeVerifierAddressFetcherDeployedByEigenLabs {},
         )
         .await?;
+        tracing::info!("SC: Canoe proof generation completed");
 
         if let Some(proof) = canoe_proofs {
             // Store the canoe proof in the witness data
+            tracing::debug!("SC: Serializing canoe proof for witness data");
             let canoe_proof_bytes =
                 serde_cbor::to_vec(&proof).expect("Failed to serialize canoe proof");
             eigenda_witness_data.canoe_proof_bytes = Some(canoe_proof_bytes);
+            tracing::debug!("SC: Successfully stored canoe proof in witness data");
+        } else {
+            tracing::debug!("SC: No canoe proof generated");
         }
 
+        tracing::debug!("SC: Serializing EigenDA witness data");
         let eigenda_witness_bytes = serde_cbor::to_vec(&eigenda_witness_data)
             .expect("Failed to serialize EigenDA witness data");
+        tracing::debug!("SC: Successfully serialized EigenDA witness data");
 
+        tracing::debug!("SC: Creating final witness data structure");
         let witness = EigenDAWitnessData {
             preimage_store: preimage_witness_store.lock().unwrap().clone(),
             blob_data: blob_data.lock().unwrap().clone(),
             eigenda_data: Some(eigenda_witness_bytes),
         };
 
+        tracing::info!("SC: EigenDA witness generator run completed successfully");
         Ok(witness)
     }
 }
