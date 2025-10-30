@@ -8564,6 +8564,7 @@ dependencies = [
  "async-trait",
  "canoe-sp1-cc-host",
  "canoe-verifier-address-fetcher",
+ "eigenda-cert",
  "hokulea-eigenda",
  "hokulea-host-bin",
  "hokulea-proof",
