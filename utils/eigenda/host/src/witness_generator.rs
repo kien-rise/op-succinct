@@ -3,9 +3,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use alloy_primitives::Address;
+use alloy_genesis::ChainConfig;
 use anyhow::Result;
 use async_trait::async_trait;
-use canoe_verifier_address_fetcher::CanoeVerifierAddressFetcherDeployedByEigenLabs;
+use canoe_verifier_address_fetcher::{
+     CanoeVerifierAddressFetcherDeployedByEigenLabs
+};
 use hokulea_proof::{
     eigenda_provider::OracleEigenDAPreimageProvider, eigenda_witness::EigenDAWitness,
 };
@@ -33,7 +37,10 @@ type WitnessExecutor = EigenDAWitnessExecutor<
     OracleEigenDAPreimageProvider<DefaultOracleBase>,
 >;
 
-pub struct EigenDAWitnessGenerator {}
+pub struct EigenDAWitnessGenerator {
+    pub custom_chain_config: Option<ChainConfig>,
+    pub custom_canoe_verifier_address: Option<Address>,
+}
 
 #[async_trait]
 impl WitnessGenerator for EigenDAWitnessGenerator {
@@ -86,7 +93,7 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         hint_chan: NativeChannel,
     ) -> Result<Self::WitnessData> {
         tracing::info!("SC: Starting EigenDA witness generator run");
-        
+
         tracing::debug!("SC: Initializing preimage witness store and blob data");
         let preimage_witness_store = Arc::new(std::sync::Mutex::new(PreimageStore::default()));
         let blob_data = Arc::new(std::sync::Mutex::new(BlobData::default()));
@@ -123,12 +130,12 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         tracing::info!("SC: Getting inputs for pipeline");
         let (boot_info, input) = get_inputs_for_pipeline(oracle.clone()).await.unwrap();
         tracing::debug!("SC: Successfully retrieved boot info and pipeline inputs");
-        
+
         if let Some((cursor, l1_provider, l2_provider)) = input {
             tracing::info!("SC: Pipeline inputs available, creating and running pipeline");
             let rollup_config = Arc::new(boot_info.rollup_config.clone());
             let l1_config = Arc::new(boot_info.l1_config.clone());
-            
+
             tracing::debug!("SC: Creating witness executor pipeline");
             let pipeline = WitnessExecutorTrait::create_pipeline(
                 &executor,
@@ -143,7 +150,7 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             .await
             .unwrap();
             tracing::info!("SC: Successfully created pipeline, starting execution");
-            
+
             WitnessExecutorTrait::run(&executor, boot_info.clone(), pipeline, cursor, l2_provider)
                 .await
                 .unwrap();
@@ -161,23 +168,40 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         tracing::info!("SC: Starting canoe proof generation");
         use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
         let eth_rpc_url = std::env::var("L1_RPC")
-            .map_err(|_| anyhow::anyhow!("L1_RPC environment variable not set"))?;
+            .map_err(|_| anyhow::anyhow!("L1_RPC environment variable not set"))?
+            .parse::<url::Url>()
+            .map_err(|_| anyhow::anyhow!("Invalid URL"))?;
         let mock_mode = env::var("OP_SUCCINCT_MOCK")
             .unwrap_or("false".to_string())
             .parse::<bool>()
             .unwrap_or(false);
-        tracing::debug!("SC: Canoe provider config - eth_rpc_url: {}, mock_mode: {}", eth_rpc_url, mock_mode);
-        
-        let canoe_provider = CanoeSp1CCReducedProofProvider { eth_rpc_url, mock_mode };
+
+        tracing::debug!(
+            "SC: Canoe provider config - eth_rpc_url: {}, mock_mode: {}",
+            eth_rpc_url,
+            mock_mode
+        );
+        let canoe_provider = CanoeSp1CCReducedProofProvider { eth_rpc_url, mock_mode, custom_chain_config: self.custom_chain_config.clone() };
         tracing::debug!("SC: Generating canoe proof from boot info");
-        let canoe_proofs = hokulea_witgen::from_boot_info_to_canoe_proof(
-            &boot_info,
-            &eigenda_witness_data,
-            oracle.clone(),
-            canoe_provider,
-            CanoeVerifierAddressFetcherDeployedByEigenLabs {},
-        )
-        .await?;
+
+        let canoe_proofs = if let Some(canoe_verifier_address) = self.custom_canoe_verifier_address {
+            hokulea_witgen::from_boot_info_to_canoe_proof(
+                &boot_info,
+                &eigenda_witness_data,
+                oracle.clone(),
+                canoe_provider,
+                canoe_verifier_address,
+            ).await?
+        } else {
+            hokulea_witgen::from_boot_info_to_canoe_proof(
+                &boot_info,
+                &eigenda_witness_data,
+                oracle.clone(),
+                canoe_provider,
+                CanoeVerifierAddressFetcherDeployedByEigenLabs {},
+            ).await?
+        };
+
         tracing::info!("SC: Canoe proof generation completed");
 
         if let Some(proof) = canoe_proofs {
