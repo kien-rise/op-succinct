@@ -80,21 +80,17 @@ impl OPSuccinctHost for EigenDAOPSuccinctHost {
 
 impl EigenDAOPSuccinctHost {
     pub fn new(fetcher: Arc<OPSuccinctDataFetcher>) -> Self {
-        let custom_chain_config = match std::env::var("RISE_L1_GENESIS_PATH") {
-            Ok(path) if !path.is_empty() => {
-                let json = std::fs::read_to_string(&path)
-                    .expect("Failed to read genesis file at RISE_L1_GENESIS_PATH");
-                let genesis = serde_json::from_str::<alloy_genesis::Genesis>(&json)
-                    .expect("Failed to parse L1 genesis from RISE_L1_GENESIS_PATH");
-                Some(genesis.config)
-            }
-            _ => None,
-        };
+        let custom_chain_config = fetcher.l1_config_path.as_ref().map(|path| {
+            let json = std::fs::read_to_string(path).expect("Failed to read genesis file");
+            let genesis: alloy_genesis::Genesis =
+                serde_json::from_str(&json).expect("Failed to parse L1 genesis");
+            genesis.config
+        });
 
-        let custom_canoe_verifier_address = match std::env::var("RISE_CANOE_VERIFIER_ADDRESS") {
+        let custom_canoe_verifier_address = match std::env::var("CANOE_VERIFIER_ADDRESS") {
             Ok(addr) if !addr.is_empty() => Some(
                 Address::from_str(&addr)
-                    .expect("Failed to parse RISE_CANOE_VERIFIER_ADDRESS as valid address"),
+                    .expect("Failed to parse CANOE_VERIFIER_ADDRESS as valid address"),
             ),
             _ => None,
         };
