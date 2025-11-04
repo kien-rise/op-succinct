@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use alloy_eips::BlockId;
-use alloy_primitives::B256;
+use alloy_primitives::{Address, B256};
 use anyhow::Result;
 use async_trait::async_trait;
 use hokulea_host_bin::cfg::SingleChainHostWithEigenDA;
@@ -80,6 +80,27 @@ impl OPSuccinctHost for EigenDAOPSuccinctHost {
 
 impl EigenDAOPSuccinctHost {
     pub fn new(fetcher: Arc<OPSuccinctDataFetcher>) -> Self {
-        Self { fetcher, witness_generator: Arc::new(EigenDAWitnessGenerator {}) }
+        let custom_chain_config = fetcher.l1_config_path.as_ref().map(|path| {
+            let json = std::fs::read_to_string(path).expect("Failed to read genesis file");
+            let genesis: alloy_genesis::Genesis =
+                serde_json::from_str(&json).expect("Failed to parse L1 genesis");
+            genesis.config
+        });
+
+        let custom_canoe_verifier_address = match std::env::var("CANOE_VERIFIER_ADDRESS") {
+            Ok(addr) if !addr.is_empty() => Some(
+                Address::from_str(&addr)
+                    .expect("Failed to parse CANOE_VERIFIER_ADDRESS as valid address"),
+            ),
+            _ => None,
+        };
+
+        Self {
+            fetcher,
+            witness_generator: Arc::new(EigenDAWitnessGenerator {
+                custom_chain_config,
+                custom_canoe_verifier_address,
+            }),
+        }
     }
 }
