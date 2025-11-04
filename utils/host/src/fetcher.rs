@@ -657,7 +657,7 @@ impl OPSuccinctDataFetcher {
         let l2_provider = self.l2_provider.clone();
 
         // Get L2 output data.
-        let l2_chain_id = l2_provider.get_chain_id().await?.unwrap();
+        let l2_chain_id = l2_provider.get_chain_id().await?;
         let l2_output_block =
             l2_provider.get_block_by_number(l2_start_block.into()).await?.ok_or_else(|| {
                 anyhow::anyhow!("Block not found for block number {}", l2_start_block)

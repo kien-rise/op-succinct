@@ -3,6 +3,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use alloy_genesis::ChainConfig;
+use alloy_primitives::Address;
 use anyhow::Result;
 use async_trait::async_trait;
 use canoe_verifier_address_fetcher::CanoeVerifierAddressFetcherDeployedByEigenLabs;
@@ -35,7 +37,10 @@ type WitnessExecutor = EigenDAWitnessExecutor<
     OracleEigenDAPreimageProvider<DefaultOracleBase>,
 >;
 
-pub struct EigenDAWitnessGenerator {}
+pub struct EigenDAWitnessGenerator {
+    pub custom_chain_config: Option<ChainConfig>,
+    pub custom_canoe_verifier_address: Option<Address>,
+}
 
 #[async_trait]
 impl WitnessGenerator for EigenDAWitnessGenerator {
@@ -148,15 +153,31 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             .unwrap_or("false".to_string())
             .parse::<bool>()
             .unwrap_or(false);
-        let canoe_provider = CanoeSp1CCReducedProofProvider { eth_rpc_url, mock_mode };
-        let maybe_canoe_proof = hokulea_witgen::from_boot_info_to_canoe_proof(
-            &boot_info,
-            &eigenda_preimage_data,
-            oracle.clone(),
-            canoe_provider,
-            CanoeVerifierAddressFetcherDeployedByEigenLabs {},
-        )
-        .await?;
+        let canoe_provider = CanoeSp1CCReducedProofProvider {
+            eth_rpc_url,
+            mock_mode,
+            custom_chain_config: self.custom_chain_config.clone(),
+        };
+        let maybe_canoe_proof =
+            if let Some(canoe_verifier_address) = self.custom_canoe_verifier_address {
+                hokulea_witgen::from_boot_info_to_canoe_proof(
+                    &boot_info,
+                    &eigenda_preimage_data,
+                    oracle.clone(),
+                    canoe_provider,
+                    canoe_verifier_address,
+                )
+                .await?
+            } else {
+                hokulea_witgen::from_boot_info_to_canoe_proof(
+                    &boot_info,
+                    &eigenda_preimage_data,
+                    oracle.clone(),
+                    canoe_provider,
+                    CanoeVerifierAddressFetcherDeployedByEigenLabs {},
+                )
+                .await?
+            };
 
         let maybe_canoe_proof_bytes =
             maybe_canoe_proof.map(|proof| serde_cbor::to_vec(&proof).expect("serde error"));
