@@ -10309,6 +10309,7 @@ dependencies = [
 name = "range-eigenda"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
  "canoe-sp1-cc-verifier",
  "canoe-verifier-address-fetcher",
  "hokulea-proof",

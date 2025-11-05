@@ -42,7 +42,7 @@ fn main() {
         let preloaded_preimage_provider = eigenda_witness_to_preloaded_provider(
             oracle.clone(),
             CanoeSp1CCVerifier {},
-            CanoeVerifierAddressFetcherDeployedByEigenLabs {},
+            alloy_primitives::address!("fb354f01d3d37948bf287449f3195ac646c2f807"),
             eigenda_witness,
         )
         .await
