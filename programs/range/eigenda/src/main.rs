@@ -9,6 +9,7 @@
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
+use alloy_primitives::Address;
 use canoe_sp1_cc_verifier::CanoeSp1CCVerifier;
 use canoe_verifier_address_fetcher::CanoeVerifierAddressFetcherDeployedByEigenLabs;
 use hokulea_proof::eigenda_witness::EigenDAWitness;
@@ -39,14 +40,34 @@ fn main() {
             &witness_data.eigenda_data.clone().expect("eigenda witness data is not present"),
         )
         .expect("cannot deserialize eigenda witness");
-        let preloaded_preimage_provider = eigenda_witness_to_preloaded_provider(
-            oracle.clone(),
-            CanoeSp1CCVerifier {},
-            CanoeVerifierAddressFetcherDeployedByEigenLabs {},
-            eigenda_witness,
-        )
-        .await
-        .expect("Failed to get preloaded blob provider");
+        let canoe_sp1_cc_key = match option_env!("CANOE_VERIFIER_VKEY") {
+            Some(vkey_hex) => CanoeSp1CCVerifier::new(
+                &vkey_hex.parse().expect("CANOE_VERIFIER_VKEY must be a valid hex string"),
+            ),
+            None => CanoeSp1CCVerifier::default(),
+        };
+
+        let preloaded_preimage_provider =
+            if let Some(addr_str) = option_env!("CANOE_VERIFIER_ADDRESS") {
+                eigenda_witness_to_preloaded_provider(
+                    oracle.clone(),
+                    canoe_sp1_cc_key,
+                    addr_str
+                        .parse::<Address>()
+                        .expect("CANOE_VERIFIER_ADDRESS must be a valid hex address"),
+                    eigenda_witness,
+                )
+                .await
+            } else {
+                eigenda_witness_to_preloaded_provider(
+                    oracle.clone(),
+                    canoe_sp1_cc_key,
+                    CanoeVerifierAddressFetcherDeployedByEigenLabs {},
+                    eigenda_witness,
+                )
+                .await
+            }
+            .expect("Failed to get preloaded blob provider");
 
         run_range_program(EigenDAWitnessExecutor::new(preloaded_preimage_provider), oracle, beacon)
             .await;

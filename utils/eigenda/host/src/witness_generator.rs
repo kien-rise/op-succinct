@@ -40,6 +40,7 @@ type WitnessExecutor = EigenDAWitnessExecutor<
 pub struct EigenDAWitnessGenerator {
     pub custom_chain_config: Option<ChainConfig>,
     pub custom_canoe_verifier_address: Option<Address>,
+    pub custom_canoe_client_elf: Option<Vec<u8>>,
 }
 
 #[async_trait]
@@ -65,9 +66,12 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             if let Some(proof_bytes) = eigenda_witness.canoe_proof_bytes.take() {
                 // Get the canoe SP1 CC client ELF and setup verification key
                 // The ELF is included in the canoe-sp1-cc-host crate
-                const CANOE_ELF: &[u8] = canoe_sp1_cc_host::ELF;
+                let canoe_elf: &[u8] = self
+                    .custom_canoe_client_elf
+                    .as_deref()
+                    .unwrap_or(canoe_sp1_cc_host::DEFAULT_ELF);
                 let client = ProverClient::from_env();
-                let (_pk, canoe_vk) = client.setup(CANOE_ELF);
+                let (_pk, canoe_vk) = client.setup(canoe_elf);
 
                 let reduced_proof: SP1ReduceProof<InnerSC> =
                     serde_cbor::from_slice(&proof_bytes)
@@ -157,6 +161,7 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             eth_rpc_url,
             mock_mode,
             custom_chain_config: self.custom_chain_config.clone(),
+            custom_canoe_client_elf: self.custom_canoe_client_elf.clone(),
         };
         let maybe_canoe_proof =
             if let Some(canoe_verifier_address) = self.custom_canoe_verifier_address {
