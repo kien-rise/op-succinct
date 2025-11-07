@@ -40,6 +40,7 @@ type WitnessExecutor = EigenDAWitnessExecutor<
 pub struct EigenDAWitnessGenerator {
     pub custom_chain_config: Option<ChainConfig>,
     pub custom_canoe_verifier_address: Option<Address>,
+    pub custom_canoe_client_elf: Option<Vec<u8>>,
 }
 
 #[async_trait]
@@ -157,6 +158,7 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             eth_rpc_url,
             mock_mode,
             custom_chain_config: self.custom_chain_config.clone(),
+            custom_canoe_client_elf: self.custom_canoe_client_elf.clone(),
         };
         let maybe_canoe_proof =
             if let Some(canoe_verifier_address) = self.custom_canoe_verifier_address {

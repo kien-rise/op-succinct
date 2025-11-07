@@ -95,11 +95,19 @@ impl EigenDAOPSuccinctHost {
             _ => None,
         };
 
+        let custom_canoe_client_elf = match std::env::var("CANOE_CLIENT_ELF") {
+            Ok(path) if !path.is_empty() => {
+                Some(std::fs::read(&path).expect("Failed to read CANOE_CLIENT_ELF file"))
+            }
+            _ => None,
+        };
+
         Self {
             fetcher,
             witness_generator: Arc::new(EigenDAWitnessGenerator {
                 custom_chain_config,
                 custom_canoe_verifier_address,
+                custom_canoe_client_elf,
             }),
         }
     }
