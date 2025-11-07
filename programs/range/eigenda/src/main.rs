@@ -40,9 +40,9 @@ fn main() {
             &witness_data.eigenda_data.clone().expect("eigenda witness data is not present"),
         )
         .expect("cannot deserialize eigenda witness");
-        let canoe_sp1_cc_key = match option_env!("CANOE_SP1_CC_VKEY") {
+        let canoe_sp1_cc_key = match option_env!("CANOE_VERIFIER_VKEY") {
             Some(vkey_hex) => CanoeSp1CCVerifier::new(
-                &vkey_hex.parse().expect("CANOE_SP1_CC_VKEY must be a valid hex string"),
+                &vkey_hex.parse().expect("CANOE_VERIFIER_VKEY must be a valid hex string"),
             ),
             None => CanoeSp1CCVerifier::default(),
         };
