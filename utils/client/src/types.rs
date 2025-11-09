@@ -34,3 +34,12 @@ pub fn u32_to_u8(input: [u32; 8]) -> [u8; 32] {
     }
     output
 }
+
+/// Convert a u8 array to a u32 array. Inverse of `u32_to_u8`.
+pub fn u8_to_u32(bytes: &[u8; 32]) -> [u32; 8] {
+    let mut limbs = [0u32; 8];
+    for i in 0..8 {
+        limbs[i] = u32::from_be_bytes(bytes[i * 4..(i + 1) * 4].try_into().unwrap());
+    }
+    limbs
+}

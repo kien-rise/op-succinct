@@ -9,12 +9,15 @@
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
-use alloy_primitives::Address;
+use alloy_primitives::{Address, B256};
 use canoe_sp1_cc_verifier::CanoeSp1CCVerifier;
 use canoe_verifier_address_fetcher::CanoeVerifierAddressFetcherDeployedByEigenLabs;
 use hokulea_proof::eigenda_witness::EigenDAWitness;
 use hokulea_zkvm_verification::eigenda_witness_to_preloaded_provider;
-use op_succinct_client_utils::witness::{EigenDAWitnessData, WitnessData};
+use op_succinct_client_utils::{
+    types::u8_to_u32,
+    witness::{EigenDAWitnessData, WitnessData},
+};
 use op_succinct_eigenda_client_utils::executor::EigenDAWitnessExecutor;
 use op_succinct_range_utils::run_range_program;
 #[cfg(feature = "tracing-subscriber")]
@@ -41,9 +44,12 @@ fn main() {
         )
         .expect("cannot deserialize eigenda witness");
         let canoe_sp1_cc_key = match option_env!("CANOE_VERIFIER_VKEY") {
-            Some(vkey_hex) => CanoeSp1CCVerifier::new(
-                &vkey_hex.parse().expect("CANOE_VERIFIER_VKEY must be a valid hex string"),
-            ),
+            Some(vkey_hex) => {
+                let bytes = vkey_hex
+                    .parse::<B256>()
+                    .expect("CANOE_VERIFIER_VKEY must be a valid hex string");
+                CanoeSp1CCVerifier::new(u8_to_u32(&bytes))
+            }
             None => CanoeSp1CCVerifier::default(),
         };
 
