@@ -735,8 +735,9 @@ impl OPSuccinctDataFetcher {
                 self.rpc_config.l2_rpc.as_str().trim_end_matches('/').to_string(),
             ),
             l1_node_address: Some(
-                self.rpc_config.l1_rpc.as_str().trim_end_matches('/').to_string(), // NOTE:
+                self.rpc_config.l1_rpc.as_str().trim_end_matches('/').to_string(),
             ),
+            l1_requests_per_second: self.rpc_config.l1_requests_per_second,
             l1_beacon_address,
             data_dir: None, // Use in-memory key-value store.
             native: false,
