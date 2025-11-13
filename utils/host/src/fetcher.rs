@@ -14,7 +14,7 @@ use alloy_provider::{Provider, ProviderBuilder, RootProvider};
 use alloy_rlp::Decodable;
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_sol_types::SolValue;
-use alloy_transport::layers::ThrottleLayer;
+use alloy_transport::layers::{RetryBackoffLayer, ThrottleLayer};
 use anyhow::{anyhow, bail, Context, Result};
 use futures::{stream, StreamExt};
 use kona_genesis::RollupConfig;
@@ -54,6 +54,7 @@ impl Default for OPSuccinctDataFetcher {
 pub struct RPCConfig {
     pub l1_rpc: Url,
     pub l1_requests_per_second: Option<u32>,
+    pub l1_max_retries: Option<u32>,
     pub l1_beacon_rpc: Option<Url>,
     pub l2_rpc: Url,
     // TODO(fakedev9999): Make optional if possible.
@@ -62,12 +63,23 @@ pub struct RPCConfig {
 
 impl RPCConfig {
     fn get_l1_client(&self) -> RpcClient {
-        if let Some(requests_per_second) = self.l1_requests_per_second {
-            ClientBuilder::default()
-                .layer(ThrottleLayer::new(requests_per_second))
-                .http(self.l1_rpc.clone())
+        let l1_rpc_url = self.l1_rpc.clone();
+
+        if let Some(max_retries) = self.l1_max_retries {
+            let requests_per_second = self.l1_requests_per_second.unwrap();
+            let initial_backoff_ms = {
+                let base = 1000u64 / requests_per_second as u64;
+                let scalar = (max_retries.ilog2() + 1) as u64;
+                base * scalar
+            };
+            let middleware =
+                RetryBackoffLayer::new(max_retries, initial_backoff_ms, requests_per_second as u64)
+                    .with_avg_unit_cost(1);
+            ClientBuilder::default().layer(middleware).http(l1_rpc_url)
+        } else if let Some(rps) = self.l1_requests_per_second {
+            ClientBuilder::default().layer(ThrottleLayer::new(rps)).http(l1_rpc_url)
         } else {
-            ClientBuilder::default().http(self.l1_rpc.clone())
+            ClientBuilder::default().http(l1_rpc_url)
         }
     }
 
@@ -89,6 +101,7 @@ pub enum RPCMode {
 ///
 /// L1_RPC: The L1 RPC URL.
 /// L1_REQUESTS_PER_SECOND: The maximum number of L1 RPC requests per second.
+/// L1_MAX_RETRIES: Optional. The maximum number of retries for L1 RPC requests.
 /// L1_BEACON_RPC: The L1 beacon RPC URL.
 /// L2_RPC: The L2 RPC URL.
 /// L2_NODE_RPC: The L2 node RPC URL.
@@ -99,6 +112,8 @@ pub fn get_rpcs_from_env() -> RPCConfig {
         .expect("L1_REQUESTS_PER_SECOND must be set")
         .parse()
         .ok();
+    let l1_max_retries: Option<u32> =
+        env::var("L1_MAX_RETRIES").expect("L1_MAX_RETRIES must be set").parse().ok();
 
     // L1_BEACON_RPC is optional. If not set or empty, set to None.
     let l1_beacon_rpc = maybe_l1_beacon_rpc
@@ -113,6 +128,7 @@ pub fn get_rpcs_from_env() -> RPCConfig {
     RPCConfig {
         l1_rpc: Url::parse(&l1_rpc).expect("L1_RPC must be a valid URL"),
         l1_requests_per_second,
+        l1_max_retries,
         l1_beacon_rpc,
         l2_rpc: Url::parse(&l2_rpc).expect("L2_RPC must be a valid URL"),
         l2_node_rpc: Url::parse(&l2_node_rpc).expect("L2_NODE_RPC must be a valid URL"),
@@ -738,6 +754,7 @@ impl OPSuccinctDataFetcher {
                 self.rpc_config.l1_rpc.as_str().trim_end_matches('/').to_string(),
             ),
             l1_requests_per_second: self.rpc_config.l1_requests_per_second,
+            l1_max_retries: self.rpc_config.l1_max_retries,
             l1_beacon_address,
             data_dir: None, // Use in-memory key-value store.
             native: false,
