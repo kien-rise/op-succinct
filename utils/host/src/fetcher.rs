@@ -114,6 +114,11 @@ pub fn get_rpcs_from_env() -> RPCConfig {
         .ok();
     let l1_max_retries: Option<u32> =
         env::var("L1_MAX_RETRIES").expect("L1_MAX_RETRIES must be set").parse().ok();
+    tracing::info!(
+        "get_rpcs_from_env: l1_requests_per_second={:?} l1_max_retries={:?}",
+        &l1_requests_per_second,
+        &l1_max_retries
+    );
 
     // L1_BEACON_RPC is optional. If not set or empty, set to None.
     let l1_beacon_rpc = maybe_l1_beacon_rpc
