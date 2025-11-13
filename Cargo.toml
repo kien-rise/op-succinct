@@ -102,15 +102,15 @@ hana-host = { git = "https://github.com/celestiaorg/hana", rev = "917269b572a43a
 hana-oracle = { git = "https://github.com/celestiaorg/hana", rev = "917269b572a43aa35a5248f2b4b2debfeb1037b6" }
 
 # hokulea
-hokulea-compute-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "49cd52913e93ab92446034f4b4c183a1f0c69b55" }
-hokulea-eigenda = { git = "https://github.com/Layr-Labs/hokulea", rev = "49cd52913e93ab92446034f4b4c183a1f0c69b55" }
-hokulea-host-bin = { git = "https://github.com/Layr-Labs/hokulea", rev = "49cd52913e93ab92446034f4b4c183a1f0c69b55" }
-hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "49cd52913e93ab92446034f4b4c183a1f0c69b55" }
-hokulea-witgen = { git = "https://github.com/Layr-Labs/hokulea", rev = "49cd52913e93ab92446034f4b4c183a1f0c69b55" }
-hokulea-zkvm-verification = { git = "https://github.com/Layr-Labs/hokulea", rev = "49cd52913e93ab92446034f4b4c183a1f0c69b55" }
-canoe-sp1-cc-host = { git = "https://github.com/Layr-Labs/hokulea", rev = "49cd52913e93ab92446034f4b4c183a1f0c69b55" }
-canoe-sp1-cc-verifier = { git = "https://github.com/Layr-Labs/hokulea", rev = "49cd52913e93ab92446034f4b4c183a1f0c69b55" }
-canoe-verifier-address-fetcher = { git = "https://github.com/Layr-Labs/hokulea", rev = "49cd52913e93ab92446034f4b4c183a1f0c69b55" }
+hokulea-compute-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "2f592cbfeff5d4c59193dfad08debe0caf44ad7a" }
+hokulea-eigenda = { git = "https://github.com/Layr-Labs/hokulea", rev = "2f592cbfeff5d4c59193dfad08debe0caf44ad7a" }
+hokulea-host-bin = { git = "https://github.com/Layr-Labs/hokulea", rev = "2f592cbfeff5d4c59193dfad08debe0caf44ad7a" }
+hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "2f592cbfeff5d4c59193dfad08debe0caf44ad7a" }
+hokulea-witgen = { git = "https://github.com/Layr-Labs/hokulea", rev = "2f592cbfeff5d4c59193dfad08debe0caf44ad7a" }
+hokulea-zkvm-verification = { git = "https://github.com/Layr-Labs/hokulea", rev = "2f592cbfeff5d4c59193dfad08debe0caf44ad7a" }
+canoe-sp1-cc-host = { git = "https://github.com/Layr-Labs/hokulea", rev = "2f592cbfeff5d4c59193dfad08debe0caf44ad7a" }
+canoe-sp1-cc-verifier = { git = "https://github.com/Layr-Labs/hokulea", rev = "2f592cbfeff5d4c59193dfad08debe0caf44ad7a" }
+canoe-verifier-address-fetcher = { git = "https://github.com/Layr-Labs/hokulea", rev = "2f592cbfeff5d4c59193dfad08debe0caf44ad7a" }
 
 # op-succinct
 op-succinct-prove = { path = "scripts/prove" }
