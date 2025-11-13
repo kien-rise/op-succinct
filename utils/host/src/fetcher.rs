@@ -12,7 +12,9 @@ use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256, U64};
 use alloy_provider::{Provider, ProviderBuilder, RootProvider};
 use alloy_rlp::Decodable;
+use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_sol_types::SolValue;
+use alloy_transport::layers::ThrottleLayer;
 use anyhow::{anyhow, bail, Context, Result};
 use futures::{stream, StreamExt};
 use kona_genesis::RollupConfig;
@@ -51,10 +53,27 @@ impl Default for OPSuccinctDataFetcher {
 #[derive(Debug, Clone)]
 pub struct RPCConfig {
     pub l1_rpc: Url,
+    pub l1_requests_per_second: Option<u32>,
     pub l1_beacon_rpc: Option<Url>,
     pub l2_rpc: Url,
     // TODO(fakedev9999): Make optional if possible.
     pub l2_node_rpc: Url,
+}
+
+impl RPCConfig {
+    fn get_l1_client(&self) -> RpcClient {
+        if let Some(requests_per_second) = self.l1_requests_per_second {
+            ClientBuilder::default()
+                .layer(ThrottleLayer::new(requests_per_second))
+                .http(self.l1_rpc.clone())
+        } else {
+            ClientBuilder::default().http(self.l1_rpc.clone())
+        }
+    }
+
+    fn get_l2_client(&self) -> RpcClient {
+        ClientBuilder::default().http(self.l2_rpc.clone())
+    }
 }
 
 /// The mode corresponding to the chain we are fetching data for.
@@ -69,12 +88,17 @@ pub enum RPCMode {
 /// Gets the RPC URLs from environment variables.
 ///
 /// L1_RPC: The L1 RPC URL.
+/// L1_REQUESTS_PER_SECOND: The maximum number of L1 RPC requests per second.
 /// L1_BEACON_RPC: The L1 beacon RPC URL.
 /// L2_RPC: The L2 RPC URL.
 /// L2_NODE_RPC: The L2 node RPC URL.
 pub fn get_rpcs_from_env() -> RPCConfig {
     let l1_rpc = env::var("L1_RPC").expect("L1_RPC must be set");
     let maybe_l1_beacon_rpc = env::var("L1_BEACON_RPC").ok();
+    let l1_requests_per_second: Option<u32> = env::var("L1_REQUESTS_PER_SECOND")
+        .expect("L1_REQUESTS_PER_SECOND must be set")
+        .parse()
+        .ok();
 
     // L1_BEACON_RPC is optional. If not set or empty, set to None.
     let l1_beacon_rpc = maybe_l1_beacon_rpc
@@ -88,6 +112,7 @@ pub fn get_rpcs_from_env() -> RPCConfig {
 
     RPCConfig {
         l1_rpc: Url::parse(&l1_rpc).expect("L1_RPC must be a valid URL"),
+        l1_requests_per_second,
         l1_beacon_rpc,
         l2_rpc: Url::parse(&l2_rpc).expect("L2_RPC must be a valid URL"),
         l2_node_rpc: Url::parse(&l2_node_rpc).expect("L2_NODE_RPC must be a valid URL"),
@@ -117,11 +142,10 @@ impl OPSuccinctDataFetcher {
     /// Gets the RPC URL's and saves the rollup config for the chain to the rollup config file.
     pub fn new() -> Self {
         let rpc_config = get_rpcs_from_env();
-
         let l1_provider =
-            Arc::new(ProviderBuilder::default().connect_http(rpc_config.l1_rpc.clone()));
+            Arc::new(ProviderBuilder::default().connect_client(rpc_config.get_l1_client()));
         let l2_provider =
-            Arc::new(ProviderBuilder::default().connect_http(rpc_config.l2_rpc.clone()));
+            Arc::new(ProviderBuilder::default().connect_client(rpc_config.get_l2_client()));
 
         OPSuccinctDataFetcher {
             rpc_config,
@@ -136,11 +160,8 @@ impl OPSuccinctDataFetcher {
     /// Initialize the fetcher with a rollup config.
     pub async fn new_with_rollup_config() -> Result<Self> {
         let rpc_config = get_rpcs_from_env();
-
-        let l1_provider =
-            Arc::new(ProviderBuilder::default().connect_http(rpc_config.l1_rpc.clone()));
-        let l2_provider =
-            Arc::new(ProviderBuilder::default().connect_http(rpc_config.l2_rpc.clone()));
+        let l1_provider = Arc::new(RootProvider::new(rpc_config.get_l1_client()));
+        let l2_provider = Arc::new(RootProvider::new(rpc_config.get_l2_client()));
 
         let (rollup_config, rollup_config_path) =
             Self::fetch_and_save_rollup_config(&rpc_config).await?;
@@ -297,7 +318,7 @@ impl OPSuccinctDataFetcher {
     /// Get the RPC URL for the given RPC mode.
     pub fn get_rpc_url(&self, rpc_mode: RPCMode) -> Result<&Url> {
         match rpc_mode {
-            RPCMode::L1 => Ok(&self.rpc_config.l1_rpc),
+            RPCMode::L1 => Ok(&self.rpc_config.l1_rpc), // NOTE:
             RPCMode::L2 => Ok(&self.rpc_config.l2_rpc),
             RPCMode::L1Beacon => self
                 .rpc_config
@@ -714,7 +735,7 @@ impl OPSuccinctDataFetcher {
                 self.rpc_config.l2_rpc.as_str().trim_end_matches('/').to_string(),
             ),
             l1_node_address: Some(
-                self.rpc_config.l1_rpc.as_str().trim_end_matches('/').to_string(),
+                self.rpc_config.l1_rpc.as_str().trim_end_matches('/').to_string(), // NOTE:
             ),
             l1_beacon_address,
             data_dir: None, // Use in-memory key-value store.
