@@ -9,6 +9,7 @@ repository.workspace = true
 
 [dependencies]
 # general
+alloy-primitives.workspace = true
 rkyv.workspace = true
 serde_cbor.workspace = true
 
