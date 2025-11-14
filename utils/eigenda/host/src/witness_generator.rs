@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use alloy_primitives::Bytes;
 use alloy_rpc_client::ClientBuilder;
 use alloy_transport::layers::{RetryBackoffLayer, ThrottleLayer};
 use anyhow::Result;
@@ -37,7 +38,9 @@ type WitnessExecutor = EigenDAWitnessExecutor<
     OracleEigenDAPreimageProvider<DefaultOracleBase>,
 >;
 
-pub struct EigenDAWitnessGenerator {}
+pub struct EigenDAWitnessGenerator {
+    pub custom_canoe_client_elf: Option<Bytes>,
+}
 
 #[async_trait]
 impl WitnessGenerator for EigenDAWitnessGenerator {
@@ -62,9 +65,12 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             if let Some(proof_bytes) = eigenda_witness.canoe_proof_bytes.take() {
                 // Get the canoe SP1 CC client ELF and setup verification key
                 // The ELF is included in the canoe-sp1-cc-host crate
-                const CANOE_ELF: &[u8] = canoe_sp1_cc_host::ELF;
+                let canoe_elf: &[u8] = match &self.custom_canoe_client_elf {
+                    Some(elf) => elf.as_ref(),
+                    None => canoe_sp1_cc_host::ELF,
+                };
                 let client = ProverClient::from_env();
-                let (_pk, canoe_vk) = client.setup(CANOE_ELF);
+                let (_pk, canoe_vk) = client.setup(canoe_elf);
 
                 let reduced_proof: SP1ReduceProof<InnerSC> =
                     serde_cbor::from_slice(&proof_bytes)
@@ -177,7 +183,11 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             .unwrap_or("false".to_string())
             .parse::<bool>()
             .unwrap_or(false);
-        let canoe_provider = CanoeSp1CCReducedProofProvider { eth_rpc_client, mock_mode };
+        let canoe_provider = CanoeSp1CCReducedProofProvider {
+            eth_rpc_client,
+            mock_mode,
+            custom_canoe_client_elf: self.custom_canoe_client_elf.clone(),
+        };
         let maybe_canoe_proof = hokulea_witgen::from_boot_info_to_canoe_proof(
             &boot_info,
             &eigenda_preimage_data,

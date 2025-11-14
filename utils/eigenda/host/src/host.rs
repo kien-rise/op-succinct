@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use alloy_eips::BlockId;
-use alloy_primitives::B256;
+use alloy_primitives::{Bytes, B256};
 use anyhow::Result;
 use async_trait::async_trait;
 use hokulea_host_bin::cfg::SingleChainHostWithEigenDA;
@@ -85,6 +85,16 @@ impl OPSuccinctHost for EigenDAOPSuccinctHost {
 
 impl EigenDAOPSuccinctHost {
     pub fn new(fetcher: Arc<OPSuccinctDataFetcher>) -> Self {
-        Self { fetcher, witness_generator: Arc::new(EigenDAWitnessGenerator {}) }
+        let custom_canoe_client_elf = match std::env::var("CANOE_CLIENT_ELF") {
+            Ok(path) if !path.is_empty() => {
+                let bytes = std::fs::read(&path).expect("Failed to read CANOE_CLIENT_ELF file");
+                Some(Bytes::from(bytes))
+            }
+            _ => None,
+        };
+        Self {
+            fetcher,
+            witness_generator: Arc::new(EigenDAWitnessGenerator { custom_canoe_client_elf }),
+        }
     }
 }
