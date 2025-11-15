@@ -37,8 +37,20 @@ async fn main() -> Result<()> {
     let proposer_config = ProposerConfig::from_env()?;
     let proposer_signer = SignerLock::from_env().await?;
 
-    let l1_provider =
-        ProviderBuilder::new().connect_http(env::var("L1_RPC").unwrap().parse::<Url>().unwrap());
+    // let l1_provider =
+    //     ProviderBuilder::new().connect_http(env::var("L1_RPC").unwrap().parse::<Url>().unwrap());
+
+    let l1_requests_per_second: Option<u32> = std::env::var("L1_REQUESTS_PER_SECOND")
+        .expect("L1_REQUESTS_PER_SECOND must be set")
+        .parse()
+        .ok();
+    let l1_max_retries: Option<u32> =
+        std::env::var("L1_MAX_RETRIES").expect("L1_MAX_RETRIES must be set").parse().ok();
+    let l1_provider = alloy_provider::RootProvider::new(kona_host::eth::rpc_client(
+        config.l1_rpc.clone(),
+        l1_requests_per_second,
+        l1_max_retries,
+    )?);
 
     let factory = DisputeGameFactory::new(
         env::var("FACTORY_ADDRESS")
