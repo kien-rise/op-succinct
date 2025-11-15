@@ -334,7 +334,7 @@ impl OPSuccinctDataFetcher {
     /// Get the RPC URL for the given RPC mode.
     pub fn get_rpc_url(&self, rpc_mode: RPCMode) -> Result<&Url> {
         match rpc_mode {
-            RPCMode::L1 => Ok(&self.rpc_config.l1_rpc), // NOTE:
+            RPCMode::L1 => Ok(&self.rpc_config.l1_rpc),
             RPCMode::L2 => Ok(&self.rpc_config.l2_rpc),
             RPCMode::L1Beacon => self
                 .rpc_config
