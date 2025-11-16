@@ -4,8 +4,6 @@ use std::{
 };
 
 use alloy_primitives::Bytes;
-use alloy_rpc_client::ClientBuilder;
-use alloy_transport::layers::{RetryBackoffLayer, ThrottleLayer};
 use anyhow::Result;
 use async_trait::async_trait;
 use canoe_verifier_address_fetcher::CanoeVerifierAddressFetcherDeployedByEigenLabs;
@@ -151,33 +149,18 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         // Generate canoe proofs using the reduced proof provider for proof aggregation
         use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
         let l1_rpc_url = std::env::var("L1_RPC")
-            .map_err(|_| anyhow::anyhow!("L1_RPC environment variable not set"))?
-            .parse()
-            .unwrap();
-
+            .map_err(|_| anyhow::anyhow!("L1_RPC environment variable not set"))?;
         let l1_requests_per_second: Option<u32> = env::var("L1_REQUESTS_PER_SECOND")
             .expect("L1_REQUESTS_PER_SECOND must be set")
             .parse()
             .ok();
         let l1_max_retries: Option<u32> =
             env::var("L1_MAX_RETRIES").expect("L1_MAX_RETRIES must be set").parse().ok();
-
-        let eth_rpc_client = if let Some(max_retries) = l1_max_retries {
-            let requests_per_second = l1_requests_per_second.unwrap();
-            let initial_backoff_ms = {
-                let base = 1000u64 / requests_per_second as u64;
-                let scalar = (max_retries.ilog2() + 1) as u64;
-                base * scalar
-            };
-            let middleware =
-                RetryBackoffLayer::new(max_retries, initial_backoff_ms, requests_per_second as u64)
-                    .with_avg_unit_cost(1);
-            ClientBuilder::default().layer(middleware).http(l1_rpc_url)
-        } else if let Some(rps) = l1_requests_per_second {
-            ClientBuilder::default().layer(ThrottleLayer::new(rps)).http(l1_rpc_url)
-        } else {
-            ClientBuilder::default().http(l1_rpc_url)
-        };
+        let eth_rpc_client = kona_host::eth::rpc_client(
+            l1_rpc_url.as_str(),
+            l1_requests_per_second,
+            l1_max_retries,
+        )?;
 
         let mock_mode = env::var("OP_SUCCINCT_MOCK")
             .unwrap_or("false".to_string())
