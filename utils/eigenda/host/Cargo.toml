@@ -16,6 +16,7 @@ op-succinct-client-utils.workspace = true
 op-succinct-host-utils.workspace = true
 
 # kona
+kona-host.workspace = true
 kona-preimage.workspace = true
 kona-proof.workspace = true
 
@@ -31,6 +32,8 @@ canoe-verifier-address-fetcher.workspace = true
 # alloy
 alloy-eips.workspace = true
 alloy-primitives.workspace = true
+alloy-rpc-client.workspace = true
+alloy-transport.workspace = true
 
 # general
 anyhow.workspace = true
