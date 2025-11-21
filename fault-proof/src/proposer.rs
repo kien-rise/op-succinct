@@ -25,8 +25,8 @@ use op_succinct_host_utils::{
 use op_succinct_proof_utils::get_range_elf_embedded;
 use op_succinct_signer_utils::SignerLock;
 use sp1_sdk::{
-    NetworkProver, Prover, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey,
-    SP1VerifyingKey, SP1_CIRCUIT_VERSION,
+    HashableKey, NetworkProver, Prover, ProverClient, SP1ProofMode, SP1ProofWithPublicValues,
+    SP1ProvingKey, SP1VerifyingKey, SP1_CIRCUIT_VERSION,
 };
 use tokio::{sync::Mutex, time};
 
@@ -74,6 +74,7 @@ struct SP1Prover {
     range_pk: Arc<SP1ProvingKey>,
     range_vk: Arc<SP1VerifyingKey>,
     agg_pk: Arc<SP1ProvingKey>,
+    agg_vk: Arc<SP1VerifyingKey>,
     agg_mode: SP1ProofMode,
 }
 
@@ -200,7 +201,13 @@ where
             ProverClient::builder().network_for(network_mode).signer(network_signer).build(),
         );
         let (range_pk, range_vk) = network_prover.setup(get_range_elf_embedded());
-        let (agg_pk, _) = network_prover.setup(AGGREGATION_ELF);
+        let (agg_pk, agg_vk) = network_prover.setup(AGGREGATION_ELF);
+
+        tracing::info!(
+            "RISE: agg_vk.bytes32()={:?} B256::from(agg_vk.hash_bytes())={:?}",
+            agg_vk.bytes32(),
+            alloy_primitives::B256::from(agg_vk.hash_bytes())
+        );
 
         let l1_requests_per_second: Option<u32> = std::env::var("L1_REQUESTS_PER_SECOND")
             .expect("L1_REQUESTS_PER_SECOND must be set")
@@ -234,6 +241,7 @@ where
                 range_pk: Arc::new(range_pk),
                 range_vk: Arc::new(range_vk),
                 agg_pk: Arc::new(agg_pk),
+                agg_vk: Arc::new(agg_vk),
                 agg_mode: config.agg_proof_mode,
             },
             fetcher: fetcher.clone(),
@@ -803,7 +811,8 @@ where
                 SP1_CIRCUIT_VERSION,
             )
         } else {
-            self.prover
+            let proof = self
+                .prover
                 .network_prover
                 .prove(&self.prover.agg_pk, &sp1_stdin)
                 .mode(self.prover.agg_mode)
@@ -815,8 +824,15 @@ where
                 .gas_limit(self.config.agg_gas_limit)
                 .whitelist(self.config.whitelist.clone())
                 .run_async()
-                .await?
+                .await?;
+            self.prover
+                .network_prover
+                .verify(&proof, &self.prover.agg_vk)
+                .expect("RISE: NetworkProver::verify failed");
+            proof
         };
+
+        // sp1_sdk::CpuProver::
 
         let transaction_request = game.prove(agg_proof.bytes().into()).into_transaction_request();
 
