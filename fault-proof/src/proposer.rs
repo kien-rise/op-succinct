@@ -826,7 +826,12 @@ where
                 .await?
         };
 
+        tracing::info!("RISE: agg_proof={:?}", &agg_proof);
+        tracing::info!("RISE: agg_proof.bytes()={:?}", alloy_primitives::Bytes::from(agg_proof.bytes()));
+
         let transaction_request = game.prove(agg_proof.bytes().into()).into_transaction_request();
+
+        tracing::info!("RISE: transaction_request={:?}", &transaction_request);
 
         let receipt = self
             .signer
