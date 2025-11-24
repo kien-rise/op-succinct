@@ -102,15 +102,15 @@ hana-host = { git = "https://github.com/celestiaorg/hana", tag = "v1.4.0-mocha" 
 hana-oracle = { git = "https://github.com/celestiaorg/hana", tag = "v1.4.0-mocha" }
 
 # hokulea
-hokulea-compute-proof = { git = "https://github.com/Layr-Labs/hokulea", tag = "hokulea-client/v1.1.0" }
-hokulea-eigenda = { git = "https://github.com/Layr-Labs/hokulea", tag = "hokulea-client/v1.1.0" }
-hokulea-host-bin = { git = "https://github.com/Layr-Labs/hokulea", tag = "hokulea-client/v1.1.0" }
-hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", tag = "hokulea-client/v1.1.0" }
-hokulea-witgen = { git = "https://github.com/Layr-Labs/hokulea", tag = "hokulea-client/v1.1.0" }
-hokulea-zkvm-verification = { git = "https://github.com/Layr-Labs/hokulea", tag = "hokulea-client/v1.1.0" }
-canoe-sp1-cc-host = { git = "https://github.com/Layr-Labs/hokulea", tag = "hokulea-client/v1.1.0" }
-canoe-sp1-cc-verifier = { git = "https://github.com/Layr-Labs/hokulea", tag = "hokulea-client/v1.1.0" }
-canoe-verifier-address-fetcher = { git = "https://github.com/Layr-Labs/hokulea", tag = "hokulea-client/v1.1.0" }
+hokulea-compute-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "99cf6cd35201cce938370581e71577dece68b1c2" }
+hokulea-eigenda = { git = "https://github.com/Layr-Labs/hokulea", rev = "99cf6cd35201cce938370581e71577dece68b1c2" }
+hokulea-host-bin = { git = "https://github.com/Layr-Labs/hokulea", rev = "99cf6cd35201cce938370581e71577dece68b1c2" }
+hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "99cf6cd35201cce938370581e71577dece68b1c2" }
+hokulea-witgen = { git = "https://github.com/Layr-Labs/hokulea", rev = "99cf6cd35201cce938370581e71577dece68b1c2" }
+hokulea-zkvm-verification = { git = "https://github.com/Layr-Labs/hokulea", rev = "99cf6cd35201cce938370581e71577dece68b1c2" }
+canoe-sp1-cc-host = { git = "https://github.com/Layr-Labs/hokulea", rev = "99cf6cd35201cce938370581e71577dece68b1c2" }
+canoe-sp1-cc-verifier = { git = "https://github.com/Layr-Labs/hokulea", rev = "99cf6cd35201cce938370581e71577dece68b1c2" }
+canoe-verifier-address-fetcher = { git = "https://github.com/Layr-Labs/hokulea", rev = "99cf6cd35201cce938370581e71577dece68b1c2" }
 
 # op-succinct
 op-succinct-prove = { path = "scripts/prove" }
@@ -217,3 +217,20 @@ substrate-bn = { git = "https://github.com/sp1-patches/bn", tag = "patch-0.6.0-s
 sha3 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha3", tag = "patch-sha3-0.10.8-sp1-4.0.0" }
 p256 = { git = "https://github.com/sp1-patches/elliptic-curves", tag = "patch-p256-13.2-sp1-5.0.0" }
 k256 = { git = "https://github.com/sp1-patches/elliptic-curves", tag = "patch-k256-13.4-sp1-5.0.0" }
+
+[patch."https://github.com/op-rs/kona"]
+kona-cli = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-client = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-derive = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-driver = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-engine = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-executor = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-genesis = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-host = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-mpt = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-preimage = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-proof = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-protocol = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-providers-alloy = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-std-fpvm = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
+kona-std-fpvm-proc = { git = "https://github.com/kien-rise/kona", rev = "4d7f79ff5f7fe69b37a586951a963ec8673a4a7f" }
