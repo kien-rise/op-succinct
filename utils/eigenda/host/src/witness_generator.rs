@@ -142,13 +142,23 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
 
         // Generate canoe proofs using the reduced proof provider for proof aggregation
         use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
-        let eth_rpc_url = std::env::var("L1_RPC")
+        let l1_rpc_url = std::env::var("L1_RPC")
             .map_err(|_| anyhow::anyhow!("L1_RPC environment variable not set"))?;
+        let l1_requests_per_second: Option<u32> =
+            env::var("L1_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
+        let l1_max_retries: Option<u32> =
+            env::var("L1_MAX_RETRIES").ok().and_then(|v| v.parse().ok());
+        let eth_rpc_client = kona_host::eth::rpc_client(
+            l1_rpc_url.as_str(),
+            l1_requests_per_second,
+            l1_max_retries,
+        )?;
+
         let mock_mode = env::var("OP_SUCCINCT_MOCK")
             .unwrap_or("false".to_string())
             .parse::<bool>()
             .unwrap_or(false);
-        let canoe_provider = CanoeSp1CCReducedProofProvider { eth_rpc_url, mock_mode };
+        let canoe_provider = CanoeSp1CCReducedProofProvider { eth_rpc_client, mock_mode };
         let maybe_canoe_proof = hokulea_witgen::from_boot_info_to_canoe_proof(
             &boot_info,
             &eigenda_preimage_data,

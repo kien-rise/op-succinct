@@ -5,6 +5,7 @@ use std::{
 };
 
 use alloy_primitives::Address;
+use alloy_rpc_client::RpcClient;
 use alloy_transport_http::reqwest::Url;
 use anyhow::{bail, Result};
 use op_succinct_host_utils::network::parse_fulfillment_strategy;
@@ -14,7 +15,7 @@ use sp1_sdk::{network::FulfillmentStrategy, SP1ProofMode};
 #[derive(Debug, Clone)]
 pub struct ProposerConfig {
     /// The L1 RPC URL.
-    pub l1_rpc: Url,
+    pub l1_rpc_client: RpcClient,
 
     /// The L2 RPC URL.
     pub l2_rpc: Url,
@@ -125,8 +126,17 @@ fn parse_whitelist(whitelist_str: &str) -> Result<Option<Vec<Address>>> {
 
 impl ProposerConfig {
     pub fn from_env() -> Result<Self> {
+        let l1_requests_per_second: Option<u32> =
+            env::var("L1_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
+        let l1_max_retries: Option<u32> =
+            env::var("L1_MAX_RETRIES").ok().and_then(|v| v.parse().ok());
+        let l1_rpc_url: Url = env::var("L1_RPC")?.parse().expect("L1_RPC not set");
         Ok(Self {
-            l1_rpc: env::var("L1_RPC")?.parse().expect("L1_RPC not set"),
+            l1_rpc_client: kona_host::eth::rpc_client(
+                l1_rpc_url,
+                l1_requests_per_second,
+                l1_max_retries,
+            )?,
             l2_rpc: env::var("L2_RPC")?.parse().expect("L2_RPC not set"),
             factory_address: env::var("FACTORY_ADDRESS")?.parse().expect("FACTORY_ADDRESS not set"),
             mock_mode: env::var("MOCK_MODE").unwrap_or("false".to_string()).parse()?,
@@ -198,7 +208,7 @@ impl ProposerConfig {
 
 #[derive(Debug, Clone)]
 pub struct ChallengerConfig {
-    pub l1_rpc: Url,
+    pub l1_rpc_client: RpcClient,
     pub l2_rpc: Url,
     pub factory_address: Address,
 
@@ -219,8 +229,18 @@ pub struct ChallengerConfig {
 
 impl ChallengerConfig {
     pub fn from_env() -> Result<Self> {
+        let l1_requests_per_second: Option<u32> =
+            env::var("L1_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
+        let l1_max_retries: Option<u32> =
+            env::var("L1_MAX_RETRIES").ok().and_then(|v| v.parse().ok());
+        let l1_rpc_url: Url = env::var("L1_RPC")?.parse().expect("L1_RPC not set");
+
         Ok(Self {
-            l1_rpc: env::var("L1_RPC")?.parse().expect("L1_RPC not set"),
+            l1_rpc_client: kona_host::eth::rpc_client(
+                l1_rpc_url,
+                l1_requests_per_second,
+                l1_max_retries,
+            )?,
             l2_rpc: env::var("L2_RPC")?.parse().expect("L2_RPC not set"),
             factory_address: env::var("FACTORY_ADDRESS")?.parse().expect("FACTORY_ADDRESS not set"),
             game_type: env::var("GAME_TYPE").expect("GAME_TYPE not set").parse()?,
