@@ -778,22 +778,26 @@ where
             (proof, total_instruction_cycles, total_sp1_gas)
         } else {
             // In network mode, we don't have access to execution stats
-            let proof = self
+            let mut builder = self
                 .prover
                 .network_prover
                 .prove(&self.prover.range_pk, &sp1_stdin)
                 .compressed()
-                .skip_simulation(true)
                 .strategy(self.config.range_proof_strategy)
                 .timeout(Duration::from_secs(self.config.timeout))
                 .min_auction_period(self.config.min_auction_period)
                 .max_price_per_pgu(self.config.max_price_per_pgu)
-                .cycle_limit(self.config.range_cycle_limit)
-                .gas_limit(self.config.range_gas_limit)
-                .whitelist(self.config.whitelist.clone())
-                .run_async()
-                .await?;
-
+                .whitelist(self.config.whitelist.clone());
+            if self.config.range_cycle_limit > 0 {
+                builder = builder.cycle_limit(self.config.range_cycle_limit);
+            }
+            if self.config.range_gas_limit > 0 {
+                builder = builder.gas_limit(self.config.range_cycle_limit);
+            }
+            if self.config.range_cycle_limit > 0 && self.config.range_gas_limit > 0 {
+                builder = builder.skip_simulation(true);
+            }
+            let proof = builder.run_async().await?;
             (proof, 0, 0)
         };
 
@@ -846,7 +850,8 @@ where
                 SP1_CIRCUIT_VERSION,
             )
         } else {
-            self.prover
+            let mut builder = self
+                .prover
                 .network_prover
                 .prove(&self.prover.agg_pk, &sp1_stdin)
                 .mode(self.prover.agg_mode)
@@ -854,11 +859,17 @@ where
                 .timeout(Duration::from_secs(self.config.timeout))
                 .min_auction_period(self.config.min_auction_period)
                 .max_price_per_pgu(self.config.max_price_per_pgu)
-                .cycle_limit(self.config.agg_cycle_limit)
-                .gas_limit(self.config.agg_gas_limit)
-                .whitelist(self.config.whitelist.clone())
-                .run_async()
-                .await?
+                .whitelist(self.config.whitelist.clone());
+            if self.config.agg_cycle_limit > 0 {
+                builder = builder.cycle_limit(self.config.agg_cycle_limit);
+            }
+            if self.config.agg_gas_limit > 0 {
+                builder = builder.gas_limit(self.config.agg_cycle_limit);
+            }
+            if self.config.agg_cycle_limit > 0 && self.config.agg_gas_limit > 0 {
+                builder = builder.skip_simulation(true);
+            }
+            builder.run_async().await?
         };
 
         let transaction_request = game.prove(agg_proof.bytes().into()).into_transaction_request();
