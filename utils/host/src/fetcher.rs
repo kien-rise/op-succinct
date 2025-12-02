@@ -12,6 +12,7 @@ use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256, U64};
 use alloy_provider::{Provider, ProviderBuilder, RootProvider};
 use alloy_rlp::Decodable;
+use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_sol_types::SolValue;
 use anyhow::{anyhow, bail, Context, Result};
 use futures::{stream, StreamExt};
@@ -51,10 +52,27 @@ impl Default for OPSuccinctDataFetcher {
 #[derive(Debug, Clone)]
 pub struct RPCConfig {
     pub l1_rpc: Url,
+    pub l1_requests_per_second: Option<u32>,
+    pub l1_max_retries: Option<u32>,
     pub l1_beacon_rpc: Option<Url>,
     pub l2_rpc: Url,
     // TODO(fakedev9999): Make optional if possible.
     pub l2_node_rpc: Url,
+}
+
+impl RPCConfig {
+    pub fn get_l1_client(&self) -> RpcClient {
+        kona_host::eth::rpc_client(
+            self.l1_rpc.as_str(),
+            self.l1_requests_per_second,
+            self.l1_max_retries,
+        )
+        .unwrap()
+    }
+
+    pub fn get_l2_client(&self) -> RpcClient {
+        ClientBuilder::default().http(self.l2_rpc.clone())
+    }
 }
 
 /// The mode corresponding to the chain we are fetching data for.
@@ -69,12 +87,20 @@ pub enum RPCMode {
 /// Gets the RPC URLs from environment variables.
 ///
 /// L1_RPC: The L1 RPC URL.
+/// L1_REQUESTS_PER_SECOND: The maximum number of L1 RPC requests per second.
+/// L1_MAX_RETRIES: Optional. The maximum number of retries for L1 RPC requests.
 /// L1_BEACON_RPC: The L1 beacon RPC URL.
 /// L2_RPC: The L2 RPC URL.
 /// L2_NODE_RPC: The L2 node RPC URL.
 pub fn get_rpcs_from_env() -> RPCConfig {
     let l1_rpc = env::var("L1_RPC").expect("L1_RPC must be set");
     let maybe_l1_beacon_rpc = env::var("L1_BEACON_RPC").ok();
+    let l1_requests_per_second: Option<u32> = env::var("L1_REQUESTS_PER_SECOND")
+        .expect("L1_REQUESTS_PER_SECOND must be set")
+        .parse()
+        .ok();
+    let l1_max_retries: Option<u32> =
+        env::var("L1_MAX_RETRIES").expect("L1_MAX_RETRIES must be set").parse().ok();
 
     // L1_BEACON_RPC is optional. If not set or empty, set to None.
     let l1_beacon_rpc = maybe_l1_beacon_rpc
@@ -88,6 +114,8 @@ pub fn get_rpcs_from_env() -> RPCConfig {
 
     RPCConfig {
         l1_rpc: Url::parse(&l1_rpc).expect("L1_RPC must be a valid URL"),
+        l1_requests_per_second,
+        l1_max_retries,
         l1_beacon_rpc,
         l2_rpc: Url::parse(&l2_rpc).expect("L2_RPC must be a valid URL"),
         l2_node_rpc: Url::parse(&l2_node_rpc).expect("L2_NODE_RPC must be a valid URL"),
@@ -119,9 +147,9 @@ impl OPSuccinctDataFetcher {
         let rpc_config = get_rpcs_from_env();
 
         let l1_provider =
-            Arc::new(ProviderBuilder::default().connect_http(rpc_config.l1_rpc.clone()));
+            Arc::new(ProviderBuilder::default().connect_client(rpc_config.get_l1_client()));
         let l2_provider =
-            Arc::new(ProviderBuilder::default().connect_http(rpc_config.l2_rpc.clone()));
+            Arc::new(ProviderBuilder::default().connect_client(rpc_config.get_l2_client()));
 
         OPSuccinctDataFetcher {
             rpc_config,
@@ -138,9 +166,9 @@ impl OPSuccinctDataFetcher {
         let rpc_config = get_rpcs_from_env();
 
         let l1_provider =
-            Arc::new(ProviderBuilder::default().connect_http(rpc_config.l1_rpc.clone()));
+            Arc::new(ProviderBuilder::default().connect_client(rpc_config.get_l1_client()));
         let l2_provider =
-            Arc::new(ProviderBuilder::default().connect_http(rpc_config.l2_rpc.clone()));
+            Arc::new(ProviderBuilder::default().connect_client(rpc_config.get_l2_client()));
 
         let (rollup_config, rollup_config_path) =
             Self::fetch_and_save_rollup_config(&rpc_config).await?;
@@ -752,6 +780,8 @@ impl OPSuccinctDataFetcher {
             l1_node_address: Some(
                 self.rpc_config.l1_rpc.as_str().trim_end_matches('/').to_string(),
             ),
+            l1_requests_per_second: self.rpc_config.l1_requests_per_second,
+            l1_max_retries: self.rpc_config.l1_max_retries,
             l1_beacon_address,
             data_dir: None, // Use in-memory key-value store.
             native: false,
