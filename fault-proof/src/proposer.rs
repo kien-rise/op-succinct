@@ -334,14 +334,33 @@ where
     /// 2. `sync_anchor_game` aligns the cached anchor pointer with the registry contract.
     /// 3. `compute_canonical_head` recomputes the head game used for proposal selection.
     pub async fn sync_state(&self) -> Result<()> {
+        tracing::info!("===== Starting state synchronization =====");
+
         // Pull new games and synchronize cached game statuses.
+        tracing::info!("Step 1: Syncing games from factory");
         self.sync_games().await?;
+        let games_count = self.state.read().await.games.len();
+        tracing::info!(games_count, "Step 1 complete: Games synced");
 
         // Align anchor information after the cached game statuses have been synchronized.
+        tracing::info!("Step 2: Syncing anchor game");
         self.sync_anchor_game().await?;
+        let anchor_info = {
+            let state = self.state.read().await;
+            state.anchor_game.as_ref().map(|g| (g.index, g.address, g.l2_block))
+        };
+        tracing::info!(?anchor_info, "Step 2 complete: Anchor game synced");
 
         // With the cached game statuses and anchor synchronized, recompute the canonical head.
+        tracing::info!("Step 3: Computing canonical head");
         self.compute_canonical_head().await;
+        let canonical_info = {
+            let state = self.state.read().await;
+            (state.canonical_head_index, state.canonical_head_l2_block)
+        };
+        tracing::info!(?canonical_info, "Step 3 complete: Canonical head computed");
+
+        tracing::info!("===== State synchronization complete =====");
 
         Ok(())
     }
@@ -668,21 +687,54 @@ where
     async fn compute_canonical_head(&self) {
         let mut state = self.state.write().await;
 
+        tracing::info!(
+            total_games = state.games.len(),
+            anchor_game = ?state.anchor_game.as_ref().map(|g| (g.index, g.address)),
+            "Computing canonical head"
+        );
+
         let canonical_head = if let Some(anchor_game) = state.anchor_game.as_ref() {
             let reachable = state.descendants_of(anchor_game.index);
-            state
+            tracing::info!(
+                anchor_index = %anchor_game.index,
+                reachable_count = reachable.len(),
+                reachable_indices = ?reachable,
+                "Filtering games to descendants of anchor"
+            );
+
+            let eligible_games: Vec<_> = state
                 .games
                 .values()
                 .filter(|game| reachable.contains(&game.index))
-                .max_by_key(|game| game.l2_block)
-                .cloned()
+                .collect();
+
+            tracing::info!(
+                eligible_count = eligible_games.len(),
+                eligible_games = ?eligible_games.iter().map(|g| (g.index, g.l2_block)).collect::<Vec<_>>(),
+                "Eligible games after filtering by reachability"
+            );
+
+            eligible_games.into_iter().max_by_key(|game| game.l2_block).cloned()
         } else {
-            state.games.values().max_by_key(|game| game.l2_block).cloned()
+            tracing::info!("No anchor game, considering all games");
+            let all_games: Vec<_> = state.games.values().collect();
+            tracing::info!(
+                all_games = ?all_games.iter().map(|g| (g.index, g.l2_block)).collect::<Vec<_>>(),
+                "All games being considered"
+            );
+            all_games.into_iter().max_by_key(|game| game.l2_block).cloned()
         };
 
         let previous_canonical_index = state.canonical_head_index;
 
         if let Some(canonical_head) = canonical_head {
+            tracing::info!(
+                selected_index = %canonical_head.index,
+                selected_l2_block = %canonical_head.l2_block,
+                selected_address = ?canonical_head.address,
+                "Selected canonical head"
+            );
+
             state.canonical_head_index = Some(canonical_head.index);
             state.canonical_head_l2_block = Some(canonical_head.l2_block);
 
@@ -696,6 +748,7 @@ where
                 );
             }
         } else {
+            tracing::info!("No canonical head found");
             // Clear stale canonical head index when no valid games exist.
             state.canonical_head_index = None;
 
