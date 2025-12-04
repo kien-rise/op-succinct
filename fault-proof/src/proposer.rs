@@ -616,7 +616,10 @@ where
                                 state.canonical_head_index
                             };
 
-                            let should_remove = if canonical_head_index == Some(index) {
+                            let should_remove = if canonical_head_index.is_none() {
+                                tracing::info!(game_index = %index, "Retaining game: we haven't determined the canonical head yet");
+                                false
+                            } else if canonical_head_index == Some(index) {
                                 tracing::info!(game_index = %index, "Retaining game: canonical head");
                                 false
                             } else {
@@ -789,7 +792,7 @@ where
         );
 
         let canonical_head = if let Some(anchor_game) = state.anchor_game.as_ref() {
-            let reachable = state.descendants_of(anchor_game.index);
+            let reachable = state.descendants_of(anchor_game.index); //
             let reachable_has_game_0 = reachable.contains(&U256::ZERO);
             tracing::info!(
                 anchor_index = %anchor_game.index,
