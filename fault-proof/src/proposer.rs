@@ -722,7 +722,7 @@ where
         game_address: Address,
         start_block: u64,
         end_block: u64,
-    ) -> Result<(TxHash, u64, u64)> {
+    ) -> Result<TxHash> {
         tracing::info!("Attempting to prove game {:?}", game_address);
 
         let fetcher = match OPSuccinctDataFetcher::new_with_rollup_config().await {
@@ -754,7 +754,7 @@ where
         };
 
         tracing::info!("Generating Range Proof");
-        let (range_proof, total_instruction_cycles, total_sp1_gas) = if self.config.mock_mode {
+        let range_proof = if self.config.mock_mode {
             tracing::info!("Using mock mode for range proof generation");
             let (public_values, report) = self
                 .prover
@@ -779,33 +779,39 @@ where
             );
 
             // Create a mock range proof with the public values.
-            let proof = SP1ProofWithPublicValues::create_mock_proof(
+            SP1ProofWithPublicValues::create_mock_proof(
                 &self.prover.range_pk,
                 public_values,
                 SP1ProofMode::Compressed,
                 SP1_CIRCUIT_VERSION,
-            );
-
-            (proof, total_instruction_cycles, total_sp1_gas)
+            )
         } else {
             // In network mode, we don't have access to execution stats
-            let proof = self
+            let mut proof_builder = self
                 .prover
                 .network_prover
                 .prove(&self.prover.range_pk, &sp1_stdin)
                 .compressed()
-                .skip_simulation(true)
                 .strategy(self.config.range_proof_strategy)
                 .timeout(Duration::from_secs(self.config.timeout))
                 .min_auction_period(self.config.min_auction_period)
                 .max_price_per_pgu(self.config.max_price_per_pgu)
-                .cycle_limit(self.config.range_cycle_limit)
-                .gas_limit(self.config.range_gas_limit)
-                .whitelist(self.config.whitelist.clone())
-                .run_async()
-                .await?;
+                .whitelist(self.config.whitelist.clone());
 
-            (proof, 0, 0)
+            if self.config.range_cycle_limit > 0 && self.config.range_gas_limit > 0 {
+                proof_builder = proof_builder
+                    .skip_simulation(true)
+                    .cycle_limit(self.config.range_cycle_limit)
+                    .gas_limit(self.config.range_gas_limit);
+            } else {
+                assert!(
+                    self.config.range_cycle_limit == 0 && self.config.range_gas_limit == 0,
+                    "range_cycle_limit and range_gas_limit must both be zero or both be non-zero"
+                );
+                proof_builder = proof_builder.skip_simulation(false);
+            }
+
+            proof_builder.run_async().await?
         };
 
         tracing::info!("Preparing Stdin for Agg Proof");
@@ -857,7 +863,8 @@ where
                 SP1_CIRCUIT_VERSION,
             )
         } else {
-            self.prover
+            let mut proof_builder = self
+                .prover
                 .network_prover
                 .prove(&self.prover.agg_pk, &sp1_stdin)
                 .mode(self.prover.agg_mode)
@@ -865,11 +872,22 @@ where
                 .timeout(Duration::from_secs(self.config.timeout))
                 .min_auction_period(self.config.min_auction_period)
                 .max_price_per_pgu(self.config.max_price_per_pgu)
-                .cycle_limit(self.config.agg_cycle_limit)
-                .gas_limit(self.config.agg_gas_limit)
-                .whitelist(self.config.whitelist.clone())
-                .run_async()
-                .await?
+                .whitelist(self.config.whitelist.clone());
+
+            if self.config.agg_cycle_limit > 0 && self.config.agg_gas_limit > 0 {
+                proof_builder = proof_builder
+                    .skip_simulation(true)
+                    .cycle_limit(self.config.agg_cycle_limit)
+                    .gas_limit(self.config.agg_gas_limit);
+            } else {
+                assert!(
+                    self.config.agg_cycle_limit == 0 && self.config.agg_gas_limit == 0,
+                    "agg_cycle_limit and agg_gas_limit must both be zero or both be non-zero"
+                );
+                proof_builder = proof_builder.skip_simulation(false);
+            }
+
+            proof_builder.run_async().await?
         };
 
         let transaction_request = game.prove(agg_proof.bytes().into()).into_transaction_request();
@@ -879,7 +897,7 @@ where
             .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
-        Ok((receipt.transaction_hash, total_instruction_cycles, total_sp1_gas))
+        Ok(receipt.transaction_hash)
     }
 
     /// Creates a new game with the given parameters.
@@ -1720,8 +1738,7 @@ where
                 let rt = tokio::runtime::Handle::current();
                 rt.block_on(async move {
                     let start_time = std::time::Instant::now();
-                    let (tx_hash, total_instruction_cycles, total_sp1_gas) =
-                        proposer.prove_game(game_address, start_block, end_block).await?;
+                    let tx_hash = proposer.prove_game(game_address, start_block, end_block).await?;
 
                     // Record successful proving
                     ProposerGauge::GamesProven.increment(1.0);
@@ -1733,8 +1750,6 @@ where
                         l2_block_end = end_block,
                         tx_hash = ?tx_hash,
                         duration_s = start_time.elapsed().as_secs_f64(),
-                        total_instruction_cycles = total_instruction_cycles,
-                        total_sp1_gas = total_sp1_gas,
                         "Game proven successfully"
                     );
                     Ok(())
@@ -1743,8 +1758,7 @@ where
         } else {
             tokio::spawn(async move {
                 let start_time = std::time::Instant::now();
-                let (tx_hash, total_instruction_cycles, total_sp1_gas) =
-                    proposer.prove_game(game_address, start_block, end_block).await?;
+                let tx_hash = proposer.prove_game(game_address, start_block, end_block).await?;
 
                 // Record successful proving
                 ProposerGauge::GamesProven.increment(1.0);
@@ -1756,8 +1770,6 @@ where
                     l2_block_end = end_block,
                     tx_hash = ?tx_hash,
                     duration_s = start_time.elapsed().as_secs_f64(),
-                    total_instruction_cycles = total_instruction_cycles,
-                    total_sp1_gas = total_sp1_gas,
                     "Game proven successfully"
                 );
                 Ok(())
