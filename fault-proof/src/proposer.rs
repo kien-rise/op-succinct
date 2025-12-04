@@ -8,7 +8,7 @@ use std::{
 };
 
 use alloy_eips::BlockNumberOrTag;
-use alloy_primitives::{Address, FixedBytes, TxHash, U256};
+use alloy_primitives::{Address, FixedBytes, TxHash, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_sol_types::{SolEvent, SolValue};
 use anyhow::{Context, Result};
@@ -25,8 +25,8 @@ use op_succinct_host_utils::{
 use op_succinct_proof_utils::get_range_elf_embedded;
 use op_succinct_signer_utils::SignerLock;
 use sp1_sdk::{
-    NetworkProver, Prover, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey,
-    SP1VerifyingKey, SP1_CIRCUIT_VERSION,
+    HashableKey, NetworkProver, Prover, ProverClient, SP1ProofMode, SP1ProofWithPublicValues,
+    SP1ProvingKey, SP1VerifyingKey, SP1_CIRCUIT_VERSION,
 };
 use tokio::{
     sync::{Mutex, RwLock},
@@ -77,6 +77,7 @@ struct SP1Prover {
     range_pk: Arc<SP1ProvingKey>,
     range_vk: Arc<SP1VerifyingKey>,
     agg_pk: Arc<SP1ProvingKey>,
+    agg_vk: Arc<SP1VerifyingKey>,
     agg_mode: SP1ProofMode,
 }
 
@@ -96,6 +97,7 @@ pub struct Game {
     pub deadline: u64,
     pub should_attempt_to_resolve: bool,
     pub should_attempt_to_claim_bond: bool,
+    pub is_provable: bool,
 }
 
 /// Central cache of the proposer's view of dispute games.
@@ -203,7 +205,7 @@ where
             ProverClient::builder().network_for(network_mode).signer(network_signer).build(),
         );
         let (range_pk, range_vk) = network_prover.setup(get_range_elf_embedded());
-        let (agg_pk, _) = network_prover.setup(AGGREGATION_ELF);
+        let (agg_pk, agg_vk) = network_prover.setup(AGGREGATION_ELF);
 
         let l1_provider = ProviderBuilder::default().connect_client(config.l1_rpc_client.clone());
         let l2_provider = ProviderBuilder::default().connect_http(config.l2_rpc.clone());
@@ -231,6 +233,7 @@ where
                 range_pk: Arc::new(range_pk),
                 range_vk: Arc::new(range_vk),
                 agg_pk: Arc::new(agg_pk),
+                agg_vk: Arc::new(agg_vk),
                 agg_mode: config.agg_proof_mode,
             },
             fetcher: fetcher.clone(),
@@ -1102,6 +1105,50 @@ where
             return Ok(GameFetchResult::InvalidGame { index });
         }
 
+        let expected_rollup_config_hash = self.fetcher.rollup_config_hash.unwrap_or_default();
+        let observed_rollup_config_hash = contract.rollupConfigHash().call().await?;
+        if observed_rollup_config_hash != expected_rollup_config_hash {
+            tracing::warn!(
+                game_index = %index,
+                ?game_address,
+                ?expected_rollup_config_hash,
+                ?observed_rollup_config_hash,
+                "Invalid game: rollup config hash mismatch"
+            );
+            return Ok(GameFetchResult::InvalidGame { index });
+        }
+
+        // Note: is_provable = false does not mean the game is invalid.
+        // Another proposer with matching ELF files may still be able to prove it.
+        // This situation can occur during Fault Proof contract upgrades.
+        let mut is_provable = true;
+
+        let expected_aggregation_vkey = self.prover.agg_vk.bytes32_raw();
+        let observed_aggregation_vkey = contract.aggregationVkey().call().await?;
+        if observed_aggregation_vkey != expected_aggregation_vkey {
+            is_provable = false;
+            tracing::warn!(
+                game_index = %index,
+                ?game_address,
+                ?expected_aggregation_vkey,
+                ?observed_aggregation_vkey,
+                "Game cannot be proven: aggregation vkey mismatch"
+            );
+        }
+
+        let expected_range_vkey_commitment = B256::from(self.prover.range_vk.hash_bytes());
+        let observed_range_vkey_commitment = contract.rangeVkeyCommitment().call().await?;
+        if observed_range_vkey_commitment != expected_range_vkey_commitment {
+            is_provable = false;
+            tracing::warn!(
+                game_index = %index,
+                ?game_address,
+                ?expected_range_vkey_commitment,
+                ?observed_range_vkey_commitment,
+                "Game cannot be proven: range vkey commitment mismatch"
+            );
+        }
+
         tracing::info!(
             game_index = %index,
             ?game_type,
@@ -1111,6 +1158,7 @@ where
             ?status,
             ?proposal_status,
             deadline = %deadline,
+            is_provable,
             "Valid game: adding to cache"
         );
 
@@ -1127,6 +1175,7 @@ where
                 deadline,
                 should_attempt_to_resolve: false,
                 should_attempt_to_claim_bond: false,
+                is_provable,
             },
         );
 
@@ -1463,6 +1512,7 @@ where
                         .values()
                         .filter(|game| game.status == GameStatus::IN_PROGRESS)
                         .filter(|game| game.proposal_status == ProposalStatus::Unchallenged)
+                        .filter(|game| game.is_provable)
                         .map(|game| (game.index, game.address))
                         .collect::<Vec<_>>();
 
@@ -1596,16 +1646,12 @@ where
     #[tracing::instrument(name = "[[Defending]]", skip(self))]
     async fn spawn_game_defense_tasks(&self) -> Result<bool> {
         // Check if there are games needing defense
-        let candidates = {
-            let state = self.state.read().await;
-            state
-                .games
-                .values()
-                .filter(|game| game.status == GameStatus::IN_PROGRESS)
-                .filter(|game| matches!(game.proposal_status, ProposalStatus::Challenged))
-                .map(|game| (game.index, game.address))
-                .collect::<Vec<_>>()
-        };
+        let candidates = (self.state.read().await.games.values())
+            .filter(|game| game.status == GameStatus::IN_PROGRESS)
+            .filter(|game| matches!(game.proposal_status, ProposalStatus::Challenged))
+            .filter(|game| game.is_provable)
+            .map(|game| (game.index, game.address))
+            .collect::<Vec<_>>();
 
         let mut active_defense_tasks_count = self.count_active_defense_tasks().await;
         let max_concurrent = self.config.max_concurrent_defense_tasks;
