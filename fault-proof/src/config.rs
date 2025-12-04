@@ -101,26 +101,22 @@ pub struct ProposerConfig {
 
     /// The list of prover addresses that are allowed to bid on proof requests.
     pub whitelist: Option<Vec<Address>>,
+
+    /// List of honest challenger addresses. Games challenged by these addresses should be ignored
+    /// for defense (don't waste resources defending against honest challengers).
+    pub honest_challenger_addresses: Vec<Address>,
 }
 
 /// Helper function to parse a comma-separated list of addresses
-fn parse_whitelist(whitelist_str: &str) -> Result<Option<Vec<Address>>> {
-    if whitelist_str.is_empty() {
-        return Ok(None);
-    }
-
-    let addresses: Result<Vec<Address>> = whitelist_str
-        .split(',')
+fn parse_address_list(raw: &str) -> Result<Vec<Address>> {
+    raw.split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
         .map(|addr_str| {
-            let addr_str = addr_str.trim().trim_start_matches("0x");
-            // Add 0x prefix since addresses are provided without it
-            let addr_with_prefix = format!("0x{}", addr_str);
-            Address::from_str(&addr_with_prefix)
+            Address::from_str(addr_str)
                 .map_err(|e| anyhow::anyhow!("Failed to parse address '{}': {:?}", addr_str, e))
         })
-        .collect();
-
-    addresses.map(|addrs| if addrs.is_empty() { None } else { Some(addrs) })
+        .collect()
 }
 
 impl ProposerConfig {
@@ -191,7 +187,14 @@ impl ProposerConfig {
             agg_gas_limit: env::var("AGG_GAS_LIMIT")
                 .unwrap_or("1000000000000".to_string()) // 1 trillion
                 .parse()?,
-            whitelist: parse_whitelist(&env::var("WHITELIST").unwrap_or("".to_string()))?,
+            whitelist: {
+                let addresses =
+                    parse_address_list(&env::var("WHITELIST").unwrap_or_default())?;
+                (!addresses.is_empty()).then_some(addresses)
+            },
+            honest_challenger_addresses: parse_address_list(
+                &env::var("HONEST_CHALLENGER_ADDRESSES").unwrap_or_default(),
+            )?,
         })
     }
 }
