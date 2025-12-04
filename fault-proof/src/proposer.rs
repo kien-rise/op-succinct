@@ -128,13 +128,33 @@ impl ProposerState {
 
         while let Some(index) = stack.pop() {
             if reachable.insert(index) {
-                stack.extend(
-                    self.games
-                        .values()
-                        .filter(|game| U256::from(game.parent_index) == index)
-                        .map(|game| game.index),
-                );
+                let children: Vec<U256> = self
+                    .games
+                    .values()
+                    .filter(|game| U256::from(game.parent_index) == index)
+                    .map(|game| game.index)
+                    .collect();
+
+                if root_index == U256::ZERO || index == U256::ZERO {
+                    tracing::warn!(
+                        ?root_index,
+                        current_index = %index,
+                        children_count = children.len(),
+                        children = ?children,
+                        "DEBUG: descendants_of processing game 0 or its subtree"
+                    );
+                }
+
+                stack.extend(children);
             }
+        }
+
+        if reachable.contains(&U256::ZERO) {
+            tracing::warn!(
+                ?root_index,
+                descendants_count = reachable.len(),
+                "DEBUG: descendants_of result includes game 0"
+            );
         }
 
         reachable
@@ -148,6 +168,9 @@ impl ProposerState {
         tracing::info!(?root_index, "Removing subtree from cache");
         for index in self.descendants_of(root_index) {
             tracing::info!(?index, "Removing game from cache");
+            if index == U256::ZERO {
+                tracing::warn!(?root_index, "DEBUG: Removing game with index 0 via remove_subtree");
+            }
             self.games.remove(&index);
         }
     }
@@ -381,6 +404,13 @@ where
     ///    - Games that are finalized but there is no credit left to claim.
     ///    - The entire subtree of a CHALLENGER_WINS game.
     pub async fn sync_games(&self) -> Result<()> {
+        // DEBUG: Check if game 0 exists at the start
+        {
+            let state = self.state.read().await;
+            let has_game_0 = state.games.contains_key(&U256::ZERO);
+            tracing::info!("DEBUG: sync_games starting, game 0 exists: {}", has_game_0);
+        }
+
         // 1. Load new games.
         let latest_index = if let Some(index) = self.factory.fetch_latest_game_index().await? {
             Cursor::from(index)
@@ -432,7 +462,7 @@ where
                     // Once we know the anchor deadline, enforce the lag constraint.
                     if let Some(anchor_d) = anchor_deadline {
                         if anchor_d.abs_diff(deadline) > MAX_GAME_DEADLINE_LAG {
-                            tracing::debug!(
+                            tracing::info!(
                                 game_index = %index,
                                 game_address = ?game_address,
                                 game_deadline = %deadline,
@@ -470,6 +500,9 @@ where
                     game_index = %idx,
                     "Removing invalid game and its subtree from cache"
                 );
+                if idx == U256::ZERO {
+                    tracing::warn!("DEBUG: Game index 0 marked as invalid and will be removed");
+                }
                 state.remove_subtree(idx);
             }
         }
@@ -523,6 +556,13 @@ where
                                 .honest_challenger_addresses
                                 .contains(&claim_data.counteredBy) =>
                     {
+                        if index == U256::ZERO {
+                            tracing::warn!(
+                                ?game_address,
+                                countered_by = ?claim_data.counteredBy,
+                                "DEBUG: Game index 0 challenged by honest challenger, scheduling RemoveSubtree"
+                            );
+                        }
                         actions.push(GameSyncAction::RemoveSubtree(index));
                     }
                     GameStatus::IN_PROGRESS => {
@@ -577,7 +617,7 @@ where
                             };
 
                             let should_remove = if canonical_head_index == Some(index) {
-                                tracing::debug!(game_index = %index, "Retaining game: canonical head");
+                                tracing::info!(game_index = %index, "Retaining game: canonical head");
                                 false
                             } else {
                                 let anchor_game = self
@@ -588,7 +628,7 @@ where
                                 let anchor_game_address = *anchor_game.address();
 
                                 if anchor_game_address == game_address {
-                                    tracing::debug!(game_index = %index, "Retaining game: anchor game");
+                                    tracing::info!(game_index = %index, "Retaining game: anchor game");
                                     false
                                 } else {
                                     true
@@ -596,6 +636,13 @@ where
                             };
 
                             if should_remove {
+                                if index == U256::ZERO {
+                                    tracing::warn!(
+                                        ?game_address,
+                                        is_canonical_head = (canonical_head_index == Some(index)),
+                                        "DEBUG: Game index 0 with DEFENDER_WINS, finalized, and zero credit scheduled for removal"
+                                    );
+                                }
                                 actions.push(GameSyncAction::Remove(index));
                             } else {
                                 actions.push(GameSyncAction::Update {
@@ -619,6 +666,12 @@ where
                         }
                     }
                     GameStatus::CHALLENGER_WINS => {
+                        if index == U256::ZERO {
+                            tracing::warn!(
+                                ?game_address,
+                                "DEBUG: Game index 0 has status CHALLENGER_WINS, scheduling RemoveSubtree"
+                            );
+                        }
                         actions.push(GameSyncAction::RemoveSubtree(index));
                     }
                     _ => unreachable!("Unexpected game status: {:?}", status),
@@ -645,14 +698,29 @@ where
                         }
                     }
                     GameSyncAction::Remove(index) => {
+                        if index == U256::ZERO {
+                            tracing::warn!(
+                                "DEBUG: Removing game with index 0 via GameSyncAction::Remove"
+                            );
+                        }
                         state.games.remove(&index);
-                        tracing::debug!(game_index = %index, "Removed game from cache");
+                        tracing::info!(game_index = %index, "Removed game from cache");
                     }
                     GameSyncAction::RemoveSubtree(index) => {
+                        if index == U256::ZERO {
+                            tracing::warn!("DEBUG: Removing game with index 0 via GameSyncAction::RemoveSubtree");
+                        }
                         state.remove_subtree(index);
                     }
                 }
             }
+        }
+
+        // DEBUG: Check if game 0 exists at the end
+        {
+            let state = self.state.read().await;
+            let has_game_0 = state.games.contains_key(&U256::ZERO);
+            tracing::info!("DEBUG: sync_games ending, game 0 exists: {}", has_game_0);
         }
 
         Ok(())
@@ -663,18 +731,43 @@ where
         let anchor_game = self.factory.get_anchor_game(self.config.game_type).await?;
         let anchor_address = anchor_game.address();
 
+        tracing::info!(
+            ?anchor_address,
+            game_type = self.config.game_type,
+            "DEBUG: sync_anchor_game - fetched anchor game from factory"
+        );
+
         if *anchor_address != Address::ZERO {
             let mut state = self.state.write().await;
 
+            tracing::info!(
+                total_games_in_cache = state.games.len(),
+                game_indices = ?state.games.keys().collect::<Vec<_>>(),
+                "DEBUG: sync_anchor_game - searching for anchor game in cache"
+            );
+
             // Fetch the anchor game from the cache.
-            if let Some((_, anchor_game)) =
+            if let Some((index, anchor_game)) =
                 state.games.iter().find(|(_, game)| game.address == *anchor_address)
             {
+                tracing::info!(
+                    ?anchor_address,
+                    anchor_index = %index,
+                    anchor_l2_block = %anchor_game.l2_block,
+                    "DEBUG: sync_anchor_game - anchor game FOUND in cache, updating state"
+                );
                 state.anchor_game = Some(anchor_game.clone());
-                tracing::debug!(?anchor_address, "Anchor game updated in cache");
+                tracing::info!(?anchor_address, "Anchor game updated in cache");
             } else {
-                tracing::debug!(?anchor_address, "Anchor game not in cache yet");
+                tracing::warn!(
+                    ?anchor_address,
+                    total_games = state.games.len(),
+                    "DEBUG: sync_anchor_game - anchor game NOT FOUND in cache"
+                );
+                tracing::info!(?anchor_address, "Anchor game not in cache yet");
             }
+        } else {
+            tracing::warn!("DEBUG: sync_anchor_game - anchor address is ZERO, no anchor game set");
         }
 
         Ok(())
@@ -687,40 +780,46 @@ where
     async fn compute_canonical_head(&self) {
         let mut state = self.state.write().await;
 
+        let has_game_0 = state.games.contains_key(&U256::ZERO);
         tracing::info!(
             total_games = state.games.len(),
+            has_game_0,
             anchor_game = ?state.anchor_game.as_ref().map(|g| (g.index, g.address)),
-            "Computing canonical head"
+            "DEBUG: compute_canonical_head starting"
         );
 
         let canonical_head = if let Some(anchor_game) = state.anchor_game.as_ref() {
             let reachable = state.descendants_of(anchor_game.index);
+            let reachable_has_game_0 = reachable.contains(&U256::ZERO);
             tracing::info!(
                 anchor_index = %anchor_game.index,
                 reachable_count = reachable.len(),
+                reachable_has_game_0,
                 reachable_indices = ?reachable,
-                "Filtering games to descendants of anchor"
+                "DEBUG: descendants of anchor computed"
             );
 
-            let eligible_games: Vec<_> = state
-                .games
-                .values()
-                .filter(|game| reachable.contains(&game.index))
-                .collect();
+            let eligible_games: Vec<_> =
+                state.games.values().filter(|game| reachable.contains(&game.index)).collect();
 
+            let eligible_has_game_0 = eligible_games.iter().any(|g| g.index == U256::ZERO);
             tracing::info!(
                 eligible_count = eligible_games.len(),
+                eligible_has_game_0,
                 eligible_games = ?eligible_games.iter().map(|g| (g.index, g.l2_block)).collect::<Vec<_>>(),
-                "Eligible games after filtering by reachability"
+                "DEBUG: eligible games after filtering by reachability"
             );
 
             eligible_games.into_iter().max_by_key(|game| game.l2_block).cloned()
         } else {
-            tracing::info!("No anchor game, considering all games");
+            tracing::warn!("DEBUG: No anchor game, considering all games");
             let all_games: Vec<_> = state.games.values().collect();
+            let all_has_game_0 = all_games.iter().any(|g| g.index == U256::ZERO);
             tracing::info!(
+                all_games_count = all_games.len(),
+                all_has_game_0,
                 all_games = ?all_games.iter().map(|g| (g.index, g.l2_block)).collect::<Vec<_>>(),
-                "All games being considered"
+                "DEBUG: all games being considered (no anchor)"
             );
             all_games.into_iter().max_by_key(|game| game.l2_block).cloned()
         };
@@ -728,11 +827,21 @@ where
         let previous_canonical_index = state.canonical_head_index;
 
         if let Some(canonical_head) = canonical_head {
+            let is_game_0 = canonical_head.index == U256::ZERO;
+            if is_game_0 {
+                tracing::warn!(
+                    selected_index = %canonical_head.index,
+                    selected_l2_block = %canonical_head.l2_block,
+                    selected_address = ?canonical_head.address,
+                    "DEBUG: Game 0 selected as canonical head!"
+                );
+            }
             tracing::info!(
                 selected_index = %canonical_head.index,
                 selected_l2_block = %canonical_head.l2_block,
                 selected_address = ?canonical_head.address,
-                "Selected canonical head"
+                is_game_0,
+                "DEBUG: canonical head selected"
             );
 
             state.canonical_head_index = Some(canonical_head.index);
@@ -788,7 +897,7 @@ where
 
         let game = OPSuccinctFaultDisputeGame::new(game_address, self.l1_provider.clone());
         let l1_head_hash = game.l1Head().call().await?.0;
-        tracing::debug!("L1 head hash: {:?}", hex::encode(l1_head_hash));
+        tracing::info!("L1 head hash: {:?}", hex::encode(l1_head_hash));
 
         let host_args = self
             .host
@@ -1118,6 +1227,9 @@ where
             let state = self.state.read().await;
 
             if state.games.contains_key(&index) {
+                if index == U256::ZERO {
+                    tracing::info!("DEBUG: Game index 0 already exists in cache, skipping fetch");
+                }
                 return Ok(GameFetchResult::AlreadyExists);
             }
         }
@@ -1234,6 +1346,16 @@ where
         );
 
         let mut state = self.state.write().await;
+        if index == U256::ZERO {
+            tracing::warn!(
+                ?game_address,
+                parent_index,
+                l2_block = %l2_block,
+                ?status,
+                ?proposal_status,
+                "DEBUG: Adding game with index 0 to cache"
+            );
+        }
         state.games.insert(
             index,
             Game {
@@ -1428,7 +1550,7 @@ where
             match self.spawn_game_creation_task().await {
                 Ok(true) => tracing::info!("Successfully spawned game creation task"),
                 Ok(false) => {
-                    tracing::debug!("No game creation needed - proposal interval not elapsed")
+                    tracing::info!("No game creation needed - proposal interval not elapsed")
                 }
                 Err(e) => tracing::warn!("Failed to spawn game creation task: {:?}", e),
             }
@@ -1439,7 +1561,7 @@ where
         // Check if we should defend games
         match self.spawn_game_defense_tasks().await {
             Ok(true) => tracing::info!("Successfully spawned game defense tasks"),
-            Ok(false) => tracing::debug!("No games need defense or task already active"),
+            Ok(false) => tracing::info!("No games need defense or task already active"),
             Err(e) => tracing::warn!("Failed to spawn game defense tasks: {:?}", e),
         }
 
@@ -1606,7 +1728,7 @@ where
 
                 for (index, game_address) in unproven_games {
                     if active_proving >= self.config.fast_finality_proving_limit {
-                        tracing::debug!(
+                        tracing::info!(
                             "Reached fast finality proving capacity ({}/{}) while resuming games",
                             active_proving,
                             self.config.fast_finality_proving_limit
@@ -1731,7 +1853,7 @@ where
 
         for (index, game_address) in candidates {
             if active_defense_tasks_count >= max_concurrent {
-                tracing::debug!(
+                tracing::info!(
                     "The max concurrent defense tasks count ({}) has been reached",
                     max_concurrent
                 );
