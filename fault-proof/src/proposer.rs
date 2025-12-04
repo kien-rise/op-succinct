@@ -498,6 +498,14 @@ where
                     self.factory.is_game_finalized(self.config.game_type, game_address).await?;
 
                 match status {
+                    GameStatus::IN_PROGRESS
+                        if claim_data.status == ProposalStatus::Challenged &&
+                            self.config
+                                .honest_challenger_addresses
+                                .contains(&claim_data.counteredBy) =>
+                    {
+                        actions.push(GameSyncAction::RemoveSubtree(index));
+                    }
                     GameStatus::IN_PROGRESS => {
                         let game_type = contract.gameType().call().await?;
                         let parent_resolved =
