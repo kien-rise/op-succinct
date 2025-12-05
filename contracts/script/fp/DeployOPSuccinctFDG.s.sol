@@ -5,22 +5,22 @@ pragma solidity ^0.8.15;
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {stdJson} from "forge-std/StdJson.sol";
-import {Claim, GameType, Hash, OutputRoot, Duration} from "src/dispute/lib/Types.sol";
-import {LibString} from "@solady/utils/LibString.sol";
+import {GameType, Hash, Proposal, Duration} from "src/dispute/lib/Types.sol";
 
 // Interfaces
 import {IDisputeGame} from "interfaces/dispute/IDisputeGame.sol";
 import {IDisputeGameFactory} from "interfaces/dispute/IDisputeGameFactory.sol";
 import {ISP1Verifier} from "@sp1-contracts/src/ISP1Verifier.sol";
 import {IAnchorStateRegistry} from "interfaces/dispute/IAnchorStateRegistry.sol";
+import {ISystemConfig} from "interfaces/L1/ISystemConfig.sol";
+import {IResourceMetering} from "interfaces/L1/IResourceMetering.sol";
 import {ISuperchainConfig} from "interfaces/L1/ISuperchainConfig.sol";
-import {IOptimismPortal2} from "interfaces/L1/IOptimismPortal2.sol";
 
 // Contracts
 import {AnchorStateRegistry} from "src/dispute/AnchorStateRegistry.sol";
 import {AccessManager} from "../../src/fp/AccessManager.sol";
-import {SuperchainConfig} from "src/L1/SuperchainConfig.sol";
 import {DisputeGameFactory} from "src/dispute/DisputeGameFactory.sol";
+import {SystemConfig} from "src/L1/SystemConfig.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {OPSuccinctFaultDisputeGame} from "../../src/fp/OPSuccinctFaultDisputeGame.sol";
 import {SP1MockVerifier} from "@sp1-contracts/src/SP1MockVerifier.sol";
@@ -85,11 +85,14 @@ contract DeployOPSuccinctFDG is Script, Utils {
         // Deploy MockOptimismPortal2 or get OptimismPortal2
         address payable portalAddress = deployOrGetOptimismPortal2(config, gameType);
 
-        OutputRoot memory startingAnchorRoot =
-            OutputRoot({root: Hash.wrap(config.startingRoot), l2BlockNumber: config.startingL2BlockNumber});
+        Proposal memory startingAnchorRoot =
+            Proposal({root: Hash.wrap(config.startingRoot), l2SequenceNumber: config.startingL2BlockNumber});
+
+        // Deploy SystemConfig
+        ISystemConfig systemConfig = deploySystemConfig();
 
         // Deploy anchor state registry
-        AnchorStateRegistry registry = deployAnchorStateRegistry(factory, portalAddress, startingAnchorRoot);
+        AnchorStateRegistry registry = deployAnchorStateRegistry(config, factory, systemConfig, startingAnchorRoot, gameType);
 
         // Deploy and configure access manager
         AccessManager accessManager = deployAccessManager(config, address(factoryProxy));
@@ -140,20 +143,24 @@ contract DeployOPSuccinctFDG is Script, Utils {
     }
 
     function deployAnchorStateRegistry(
+        FDGConfig memory config,
         DisputeGameFactory factory,
-        address payable portalAddress,
-        OutputRoot memory startingAnchorRoot
+        ISystemConfig systemConfig,
+        Proposal memory startingAnchorRoot,
+        GameType gameType
     ) internal returns (AnchorStateRegistry) {
         // Deploy the anchor state registry proxy.
+        // Note: AnchorStateRegistry now requires ISystemConfig instead of ISuperchainConfig
+        // and OptimismPortal2 is no longer a parameter.
         ERC1967Proxy registryProxy = new ERC1967Proxy(
-            address(new AnchorStateRegistry()),
+            address(new AnchorStateRegistry(config.disputeGameFinalityDelaySeconds)),
             abi.encodeCall(
                 AnchorStateRegistry.initialize,
                 (
-                    ISuperchainConfig(address(new SuperchainConfig())),
+                    systemConfig,
                     IDisputeGameFactory(address(factory)),
-                    IOptimismPortal2(portalAddress),
-                    startingAnchorRoot
+                    startingAnchorRoot,
+                    gameType
                 )
             )
         );
@@ -229,5 +236,45 @@ contract DeployOPSuccinctFDG is Script, Utils {
         }
 
         return accessManager;
+    }
+
+    function deploySystemConfig() internal returns (ISystemConfig) {
+        // Deploy SystemConfig as a proxy
+        // For testing/deployment purposes, we initialize SystemConfig with minimal configuration
+        // In production, this should be properly configured with real addresses and parameters
+        ERC1967Proxy systemConfigProxy = new ERC1967Proxy(
+            address(new SystemConfig()),
+            abi.encodeCall(
+                SystemConfig.initialize,
+                (
+                    msg.sender, // _owner
+                    0, // _basefeeScalar (can be updated later)
+                    0, // _blobbasefeeScalar (can be updated later)
+                    bytes32(0), // _batcherHash (can be updated later)
+                    30_000_000, // _gasLimit (default reasonable value)
+                    address(0), // _unsafeBlockSigner (can be updated later)
+                    IResourceMetering.ResourceConfig({
+                        maxResourceLimit: 20_000_000,
+                        elasticityMultiplier: 10,
+                        baseFeeMaxChangeDenominator: 8,
+                        minimumBaseFee: 1 gwei,
+                        systemTxMaxGas: 1_000_000,
+                        maximumBaseFee: type(uint128).max
+                    }),
+                    address(0), // _batchInbox (can be updated later)
+                    SystemConfig.Addresses({
+                        l1CrossDomainMessenger: address(0),
+                        l1ERC721Bridge: address(0),
+                        l1StandardBridge: address(0),
+                        optimismPortal: address(0),
+                        optimismMintableERC20Factory: address(0)
+                    }),
+                    block.chainid, // _l2ChainId (using current chain id)
+                    ISuperchainConfig(address(0)) // _superchainConfig (can be updated later)
+                )
+            )
+        );
+        console.log("SystemConfig:", address(systemConfigProxy));
+        return ISystemConfig(address(systemConfigProxy));
     }
 }

@@ -72,8 +72,9 @@ contract UpgradeOPSuccinctFDG is Script {
         );
 
         // Generate the calldata for setImplementation.
-        bytes memory calldata_ = abi.encodeWithSelector(
-            DisputeGameFactory.setImplementation.selector, gameType, IDisputeGame(address(newImpl))
+        // Note: setImplementation now has two overloads, manually encode to use the one without args
+        bytes memory calldata_ = abi.encodeWithSignature(
+            "setImplementation(uint32,address)", GameType.unwrap(gameType), address(newImpl)
         );
 
         string memory calldataString = string.concat("Upgrade Calldata: ", vm.toString(calldata_));

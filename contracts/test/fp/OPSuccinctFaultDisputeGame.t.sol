@@ -6,14 +6,12 @@ import "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 // Libraries
-import {Claim, Duration, GameStatus, GameType, Hash, OutputRoot, Timestamp} from "src/dispute/lib/Types.sol";
+import {Claim, Duration, GameStatus, GameType, Hash, Proposal, Timestamp} from "src/dispute/lib/Types.sol";
 import {
     BadAuth,
     IncorrectBondAmount,
-    AlreadyInitialized,
     UnexpectedRootClaim,
     NoCreditToClaim,
-    GameNotResolved,
     GameNotFinalized
 } from "src/dispute/lib/Errors.sol";
 import {
@@ -24,7 +22,7 @@ import {
     GameNotOver,
     IncorrectDisputeGameFactory
 } from "src/fp/lib/Errors.sol";
-import {AggregationOutputs, OP_SUCCINCT_FAULT_DISPUTE_GAME_TYPE} from "src/lib/Types.sol";
+import {OP_SUCCINCT_FAULT_DISPUTE_GAME_TYPE} from "src/lib/Types.sol";
 
 // Contracts
 import {DisputeGameFactory} from "src/dispute/DisputeGameFactory.sol";
@@ -38,8 +36,7 @@ import {AccessManager} from "src/fp/AccessManager.sol";
 import {IDisputeGame} from "interfaces/dispute/IDisputeGame.sol";
 import {IDisputeGameFactory} from "interfaces/dispute/IDisputeGameFactory.sol";
 import {ISP1Verifier} from "@sp1-contracts/src/ISP1Verifier.sol";
-import {ISuperchainConfig} from "interfaces/L1/ISuperchainConfig.sol";
-import {IOptimismPortal2} from "interfaces/L1/IOptimismPortal2.sol";
+import {ISystemConfig} from "interfaces/L1/ISystemConfig.sol";
 import {IAnchorStateRegistry} from "interfaces/dispute/IAnchorStateRegistry.sol";
 
 // Utils
@@ -98,19 +95,18 @@ contract OPSuccinctFaultDisputeGameTest is Test {
         SP1MockVerifier sp1Verifier = new SP1MockVerifier();
 
         // Create an anchor state registry.
-        SuperchainConfig superchainConfig = new SuperchainConfig();
         portal = new MockOptimismPortal2(gameType, disputeGameFinalityDelaySeconds);
-        OutputRoot memory startingAnchorRoot = OutputRoot({root: Hash.wrap(keccak256("genesis")), l2BlockNumber: 0});
+        Proposal memory startingAnchorRoot = Proposal({root: Hash.wrap(keccak256("genesis")), l2SequenceNumber: 0});
 
         ERC1967Proxy proxy = new ERC1967Proxy(
-            address(new AnchorStateRegistry()),
+            address(new AnchorStateRegistry(disputeGameFinalityDelaySeconds)),
             abi.encodeCall(
                 AnchorStateRegistry.initialize,
                 (
-                    ISuperchainConfig(address(superchainConfig)),
+                    ISystemConfig(address(0)), // Mock SystemConfig - not needed for tests
                     IDisputeGameFactory(address(factory)),
-                    IOptimismPortal2(payable(address(portal))),
-                    startingAnchorRoot
+                    startingAnchorRoot,
+                    gameType
                 )
             )
         );
