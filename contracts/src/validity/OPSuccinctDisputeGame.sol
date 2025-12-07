@@ -84,9 +84,14 @@ contract OPSuccinctDisputeGame is ISemver, Clone, IDisputeGame {
         return Hash.wrap(_getArgBytes32(0x34));
     }
 
-    /// @notice The l2BlockNumber of the disputed output root in the `L2OutputOracle`.
-    function l2BlockNumber() public pure returns (uint256 l2BlockNumber_) {
-        l2BlockNumber_ = _getArgUint256(0x54);
+    /// @notice The l2SequenceNumber of the disputed output root in the `L2OutputOracle`.
+    function l2SequenceNumber() public pure returns (uint256 l2SequenceNumber_) {
+        l2SequenceNumber_ = _getArgUint256(0x54);
+    }
+
+    /// @notice Legacy function name for backward compatibility.
+    function l2BlockNumber() public view returns (uint256 l2BlockNumber_) {
+        l2BlockNumber_ = this.l2SequenceNumber();
     }
 
     /// @notice The l2BlockNumber of the disputed output root in the `L2OutputOracle`.
