@@ -113,6 +113,15 @@ sol! {
 
         /// @notice Returns the credit balance of a given recipient.
         function credit(address _recipient) external view returns (uint256 credit_);
+
+        /// @notice Getter for the rollup config hash.
+        function rollupConfigHash() external view returns (bytes32 rollupConfigHash_);
+
+        /// @notice Getter for the aggregation vkey.
+        function aggregationVkey() external view returns (bytes32 aggregationVkey_);
+
+        /// @notice Getter for the range vkey commitment.
+        function rangeVkeyCommitment() external view returns (bytes32 rangeVkeyCommitment_);
     }
 
     #[allow(missing_docs)]

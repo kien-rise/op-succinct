@@ -28,7 +28,7 @@ use op_succinct_host_utils::{
 };
 use op_succinct_proof_utils::get_range_elf_embedded;
 use op_succinct_signer_utils::SignerLock;
-use sp1_sdk::{Prover, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{HashableKey, Prover, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
 use tokio::{
     sync::{Mutex, RwLock, Semaphore},
     time,
@@ -81,6 +81,28 @@ pub enum TaskInfo {
     BondClaim,
 }
 
+/// Checks if a game is provable by this instance of proposer
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct GameHashes {
+    rollup_config_hash: B256,
+    aggregation_vkey: B256,
+    range_vkey_commitment: B256,
+}
+
+impl GameHashes {
+    async fn from_contract(
+        contract: &OPSuccinctFaultDisputeGame::OPSuccinctFaultDisputeGameInstance<
+            impl Provider + Clone,
+        >,
+    ) -> Result<Self> {
+        Ok(Self {
+            rollup_config_hash: contract.rollupConfigHash().call().await?,
+            aggregation_vkey: contract.aggregationVkey().call().await?,
+            range_vkey_commitment: contract.rangeVkeyCommitment().call().await?,
+        })
+    }
+}
+
 /// Represents a dispute game in the on-chain game DAG.
 ///
 /// Games form a directed acyclic graph where each game builds upon a parent game, extending the
@@ -97,6 +119,7 @@ pub struct Game {
     pub deadline: u64,
     pub should_attempt_to_resolve: bool,
     pub should_attempt_to_claim_bond: bool,
+    pub is_provable: bool,
 }
 
 /// Central cache of the proposer's view of dispute games.
@@ -219,12 +242,13 @@ where
             ProverClient::builder().network_for(network_mode).signer(network_signer).build(),
         );
         let (range_pk, range_vk) = network_prover.setup(get_range_elf_embedded());
-        let (agg_pk, _) = network_prover.setup(AGGREGATION_ELF);
+        let (agg_pk, agg_vk) = network_prover.setup(AGGREGATION_ELF);
 
         let keys = ProofKeys {
             range_pk: Arc::new(range_pk),
             range_vk: Arc::new(range_vk),
             agg_pk: Arc::new(agg_pk),
+            agg_vk: Arc::new(agg_vk),
         };
 
         let prover = if config.mock_mode {
@@ -1237,6 +1261,14 @@ where
         Ok(())
     }
 
+    fn proposer_game_hashes(&self) -> GameHashes {
+        GameHashes {
+            rollup_config_hash: self.fetcher.rollup_config_hash.unwrap_or_default(),
+            aggregation_vkey: B256::from(self.prover.keys().agg_vk.bytes32_raw()),
+            range_vkey_commitment: B256::from(self.prover.keys().range_vk.hash_bytes()),
+        }
+    }
+
     /// Fetch game from the factory.
     ///
     /// Drop game if:
@@ -1306,6 +1338,24 @@ where
             return Ok(GameFetchResult::InvalidGame { index });
         }
 
+        // Note: `is_provable = false` does NOT imply the game is invalid.
+        // It only means this proposer's ELF files do not match.
+        // Another proposer with matching ELF files may still be able to prove it.
+        // This commonly occurs during Fault Proof contract upgrades.
+        let is_provable = {
+            let expected = self.proposer_game_hashes();
+            let observed = GameHashes::from_contract(&contract).await?;
+            if observed == expected {
+                true
+            } else {
+                tracing::warn!(
+                    game_index = %index, ?game_address, ?expected, ?observed,
+                    "Game is not provable by this proposer (hashes mismatch)"
+                );
+                false
+            }
+        };
+
         tracing::info!(
             game_index = %index,
             ?game_type,
@@ -1315,6 +1365,7 @@ where
             ?status,
             ?proposal_status,
             deadline = %deadline,
+            is_provable,
             "Valid game: adding to cache"
         );
 
@@ -1331,6 +1382,7 @@ where
                 deadline,
                 should_attempt_to_resolve: false,
                 should_attempt_to_claim_bond: false,
+                is_provable,
             },
         );
 
@@ -1593,6 +1645,36 @@ where
         }
     }
 
+    /// Verifies that the on-chain game implementation hashes match the proposer's
+    /// expected hashes for the configured game type.
+    ///
+    /// This function:
+    /// - Fetches the game implementation address for the configured game type.
+    /// - Reads the relevant hashes from the on-chain game implementation contract.
+    /// - Compares the observed hashes against the locally expected proposer hashes.
+    async fn check_game_impl_hashes(&self) -> Result<()> {
+        let game_impl = self.factory.gameImpls(self.config.game_type).call().await?;
+        if game_impl.is_zero() {
+            return Err(anyhow::anyhow!(
+                "Game creation skipped: no implementation set for game type {}",
+                self.config.game_type
+            ));
+        }
+        let contract = OPSuccinctFaultDisputeGame::new(game_impl, self.l1_provider.clone());
+        let observed = GameHashes::from_contract(&contract).await?;
+        let expected = self.proposer_game_hashes();
+
+        if observed != expected {
+            return Err(anyhow::anyhow!(
+                "Game creation skipped: hashes mismatch: expected={:?} observed={:?}",
+                expected,
+                observed
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Spawn a game creation task if conditions are met
     ///
     /// Returns:
@@ -1600,6 +1682,10 @@ where
     /// - Ok(false): No work needed (proposal interval not elapsed or no finalized blocks)
     /// - Err: Actual error occurred during task spawning
     async fn spawn_game_creation_task(&self) -> Result<bool> {
+        self.check_game_impl_hashes()
+            .await
+            .context("Pre-flight game implementation hash check failed")?;
+
         // First check if we should create a game
         let (should_create, next_l2_block_number_for_proposal, parent_game_index) =
             self.should_create_game().await?;
@@ -1667,6 +1753,7 @@ where
                         .values()
                         .filter(|game| game.status == GameStatus::IN_PROGRESS)
                         .filter(|game| game.proposal_status == ProposalStatus::Unchallenged)
+                        .filter(|game| game.is_provable)
                         .map(|game| (game.index, game.address, game.deadline))
                         .collect::<Vec<_>>();
 
@@ -1841,6 +1928,7 @@ where
                 .values()
                 .filter(|game| game.status == GameStatus::IN_PROGRESS)
                 .filter(|game| matches!(game.proposal_status, ProposalStatus::Challenged))
+                .filter(|game| game.is_provable)
                 .map(|game| (game.index, game.address, game.deadline))
                 .collect::<Vec<_>>()
         };
