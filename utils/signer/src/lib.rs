@@ -146,10 +146,12 @@ impl Signer {
                     transaction_request.to = Some(TxKind::Create);
                 }
 
+                let transaction_request_cloned = transaction_request.clone();
+
                 let receipt = provider
                     .send_transaction(transaction_request)
                     .await
-                    .context("Failed to send transaction")?
+                    .context(format!("Failed to send transaction: {:?}", transaction_request_cloned))?
                     .with_required_confirmations(NUM_CONFIRMATIONS)
                     .with_timeout(Some(Duration::from_secs(TIMEOUT_SECONDS)))
                     .get_receipt()
