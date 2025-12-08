@@ -26,8 +26,8 @@ use op_succinct_host_utils::{
 use op_succinct_proof_utils::get_range_elf_embedded;
 use op_succinct_signer_utils::SignerLock;
 use sp1_sdk::{
-    NetworkProver, Prover, ProverClient, SP1ProofMode, SP1ProofWithPublicValues, SP1ProvingKey,
-    SP1Stdin, SP1VerifyingKey, SP1_CIRCUIT_VERSION,
+    HashableKey, NetworkProver, Prover, ProverClient, SP1ProofMode, SP1ProofWithPublicValues,
+    SP1ProvingKey, SP1Stdin, SP1VerifyingKey, SP1_CIRCUIT_VERSION,
 };
 use tokio::{
     sync::{Mutex, RwLock},
@@ -80,6 +80,7 @@ struct SP1Prover {
     range_pk: Arc<SP1ProvingKey>,
     range_vk: Arc<SP1VerifyingKey>,
     agg_pk: Arc<SP1ProvingKey>,
+    agg_vk: Arc<SP1VerifyingKey>,
     agg_mode: SP1ProofMode,
 }
 
@@ -99,6 +100,7 @@ pub struct Game {
     pub deadline: u64,
     pub should_attempt_to_resolve: bool,
     pub should_attempt_to_claim_bond: bool,
+    pub is_provable: bool,
 }
 
 /// Central cache of the proposer's view of dispute games.
@@ -206,7 +208,7 @@ where
             ProverClient::builder().network_for(network_mode).signer(network_signer).build(),
         );
         let (range_pk, range_vk) = network_prover.setup(get_range_elf_embedded());
-        let (agg_pk, _) = network_prover.setup(AGGREGATION_ELF);
+        let (agg_pk, agg_vk) = network_prover.setup(AGGREGATION_ELF);
 
         let l1_provider = ProviderBuilder::default().connect_http(config.l1_rpc.clone());
         let l2_provider = ProviderBuilder::default().connect_http(config.l2_rpc.clone());
@@ -234,6 +236,7 @@ where
                 range_pk: Arc::new(range_pk),
                 range_vk: Arc::new(range_vk),
                 agg_pk: Arc::new(agg_pk),
+                agg_vk: Arc::new(agg_vk),
                 agg_mode: config.agg_proof_mode,
             },
             fetcher: fetcher.clone(),
@@ -1241,6 +1244,63 @@ where
             return Ok(GameFetchResult::InvalidGame { index });
         }
 
+        let does_rollup_config_match = {
+            let expected = self.fetcher.rollup_config_hash.unwrap_or_default();
+            let observed = contract.rollupConfigHash().call().await?;
+            if observed == expected {
+                true
+            } else {
+                tracing::warn!(
+                    game_index = %index,
+                    ?game_address,
+                    ?expected,
+                    ?observed,
+                    "Game cannot be proven: rollup config hash mismatch"
+                );
+                false
+            }
+        };
+
+        let does_aggregation_vkey_match = {
+            let expected = B256::from(self.prover.agg_vk.bytes32_raw());
+            let observed = contract.aggregationVkey().call().await?;
+            if observed == expected {
+                true
+            } else {
+                tracing::warn!(
+                    game_index = %index,
+                    ?game_address,
+                    ?expected,
+                    ?observed,
+                    "Game cannot be proven: aggregation vkey mismatch"
+                );
+                false
+            }
+        };
+
+        let does_range_vkey_match = {
+            let expected = B256::from(self.prover.range_vk.hash_bytes());
+            let observed = contract.rangeVkeyCommitment().call().await?;
+            if observed == expected {
+                true
+            } else {
+                tracing::warn!(
+                    game_index = %index,
+                    ?game_address,
+                    ?expected,
+                    ?observed,
+                    "Game cannot be proven: range vkey commitment mismatch"
+                );
+                false
+            }
+        };
+
+        // Note: is_provable = false does not mean the game is invalid.
+        // Another proposer with matching ELF files may still be able to prove it.
+        // This situation can occur during Fault Proof contract upgrades.
+        let is_provable =
+            does_rollup_config_match && does_aggregation_vkey_match && does_range_vkey_match;
+
         tracing::info!(
             game_index = %index,
             ?game_type,
@@ -1250,6 +1310,7 @@ where
             ?status,
             ?proposal_status,
             deadline = %deadline,
+            is_provable,
             "Valid game: adding to cache"
         );
 
@@ -1266,6 +1327,7 @@ where
                 deadline,
                 should_attempt_to_resolve: false,
                 should_attempt_to_claim_bond: false,
+                is_provable,
             },
         );
 
@@ -1602,6 +1664,7 @@ where
                         .values()
                         .filter(|game| game.status == GameStatus::IN_PROGRESS)
                         .filter(|game| game.proposal_status == ProposalStatus::Unchallenged)
+                        .filter(|game| game.is_provable)
                         .map(|game| (game.index, game.address))
                         .collect::<Vec<_>>();
 
@@ -1742,6 +1805,7 @@ where
                 .values()
                 .filter(|game| game.status == GameStatus::IN_PROGRESS)
                 .filter(|game| matches!(game.proposal_status, ProposalStatus::Challenged))
+                .filter(|game| game.is_provable)
                 .map(|game| (game.index, game.address, game.deadline))
                 .collect::<Vec<_>>()
         };
