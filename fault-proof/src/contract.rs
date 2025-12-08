@@ -135,6 +135,9 @@ sol! {
         /// @notice Returns whether a game is finalized.
         function isGameFinalized(IDisputeGame _game) public view returns (bool);
 
+        /// @notice Determines whether a game is retired.
+        function isGameRetired(IDisputeGame _game) public view returns (bool);
+
         /// @notice Returns the current anchor game reference.
         function anchorGame() public view returns (IDisputeGame anchorGame_);
     }
