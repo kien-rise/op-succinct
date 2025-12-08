@@ -37,6 +37,7 @@ use tokio::{
 use crate::{
     config::ProposerConfig,
     contract::{
+        AnchorStateRegistry,
         DisputeGameFactory::{DisputeGameCreated, DisputeGameFactoryInstance},
         GameStatus,
         OPSuccinctFaultDisputeGame::{self, OPSuccinctFaultDisputeGameInstance},
@@ -1203,6 +1204,21 @@ where
                 ?claim,
                 expected_output_root = ?output_root,
                 "Invalid game: root claim does not match computed output root"
+            );
+            return Ok(GameFetchResult::InvalidGame { index });
+        }
+
+        let registry = AnchorStateRegistry::new(
+            self.factory.get_anchor_state_registry_address(self.config.game_type).await?,
+            self.l1_provider.clone(),
+        );
+        let is_game_retired = registry.isGameRetired(game_address).call().await?;
+        if is_game_retired {
+            tracing::warn!(
+                game_index = %index,
+                ?game_address,
+                is_game_retired,
+                "Invalid game: game is retired"
             );
             return Ok(GameFetchResult::InvalidGame { index });
         }
