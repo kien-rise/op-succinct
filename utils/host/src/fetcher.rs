@@ -22,7 +22,7 @@ use kona_registry::L1_CONFIGS;
 use kona_rpc::{OutputResponse, SafeHeadResponse};
 use op_alloy_consensus::OpBlock;
 use op_alloy_network::{primitives::HeaderResponse, BlockResponse, Network, Optimism};
-use op_succinct_client_utils::boot::BootInfoStruct;
+use op_succinct_client_utils::boot::{hash_rollup_config, BootInfoStruct};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -39,6 +39,7 @@ pub struct OPSuccinctDataFetcher {
     pub l2_provider: Arc<RootProvider<Optimism>>,
     pub rollup_config: Option<RollupConfig>,
     pub rollup_config_path: Option<PathBuf>,
+    pub rollup_config_hash: Option<B256>, // derived from rollup_config
     pub l1_config_path: Option<PathBuf>,
 }
 
@@ -129,6 +130,7 @@ impl OPSuccinctDataFetcher {
             l2_provider,
             rollup_config: None,
             rollup_config_path: None,
+            rollup_config_hash: None,
             l1_config_path: None,
         }
     }
@@ -158,6 +160,7 @@ impl OPSuccinctDataFetcher {
             rpc_config,
             l1_provider,
             l2_provider,
+            rollup_config_hash: Some(hash_rollup_config(&rollup_config)),
             rollup_config: Some(rollup_config),
             rollup_config_path: Some(rollup_config_path),
             l1_config_path: Some(l1_config_path),
