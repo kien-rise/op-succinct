@@ -10,8 +10,8 @@ use tokio::{sync::Mutex, time};
 use crate::{
     config::ChallengerConfig,
     contract::{
-        DisputeGameFactory::DisputeGameFactoryInstance, GameStatus, OPSuccinctFaultDisputeGame,
-        ProposalStatus,
+        AnchorStateRegistry, DisputeGameFactory::DisputeGameFactoryInstance, GameStatus,
+        OPSuccinctFaultDisputeGame, ProposalStatus,
     },
     is_parent_challenger_wins, is_parent_resolved,
     prometheus::ChallengerGauge,
@@ -287,6 +287,21 @@ where
             self.l2_provider.compute_output_root_at_block(l2_block_number).await?;
         let output_root = contract.rootClaim().call().await?;
         let claim_data = contract.claimData().call().await?;
+
+        let registry = AnchorStateRegistry::new(
+            self.factory.get_anchor_state_registry_address(self.config.game_type).await?,
+            self.l1_provider.clone(),
+        );
+        let is_game_retired = registry.isGameRetired(game_address).call().await?;
+        if is_game_retired {
+            tracing::debug!(
+                game_index = %index,
+                ?game_address,
+                is_game_retired,
+                "Dropping game because it is retired"
+            );
+            return Ok(());
+        }
 
         let was_respected = contract.wasRespectedGameTypeWhenCreated().call().await?;
         let status = contract.status().call().await?;
