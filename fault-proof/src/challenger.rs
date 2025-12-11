@@ -432,7 +432,7 @@ where
             contract.challenge().value(self.challenger_bond).into_transaction_request();
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         tracing::info!(
@@ -482,7 +482,7 @@ where
         let transaction_request = contract.resolve().into_transaction_request();
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         tracing::info!(
@@ -534,7 +534,7 @@ where
             contract.claimCredit(self.signer.address()).gas(200_000).into_transaction_request();
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         tracing::info!(

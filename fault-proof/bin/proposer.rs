@@ -2,7 +2,6 @@ use std::{env, sync::Arc};
 
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
-use alloy_transport_http::reqwest::Url;
 use anyhow::Result;
 use clap::Parser;
 use fault_proof::{
@@ -38,8 +37,7 @@ async fn main() -> Result<()> {
 
     let proposer_signer = SignerLock::from_env().await?;
 
-    let l1_provider =
-        ProviderBuilder::new().connect_http(env::var("L1_RPC").unwrap().parse::<Url>().unwrap());
+    let l1_provider = ProviderBuilder::new().connect_client(proposer_config.l1_rpc_client.clone());
 
     let factory = DisputeGameFactory::new(
         env::var("FACTORY_ADDRESS")

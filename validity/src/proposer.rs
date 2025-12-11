@@ -718,7 +718,7 @@ where
                     .driver_config
                     .signer
                     .send_transaction_request(
-                        self.driver_config.fetcher.as_ref().rpc_config.l1_rpc.clone(),
+                        self.driver_config.fetcher.as_ref().rpc_config.l1_rpc_client(),
                         transaction_request,
                     )
                     .await?;
@@ -1108,7 +1108,7 @@ where
             self.driver_config
                 .signer
                 .send_transaction_request(
-                    self.driver_config.fetcher.as_ref().rpc_config.l1_rpc.clone(),
+                    self.driver_config.fetcher.as_ref().rpc_config.l1_rpc_client(),
                     transaction_request,
                 )
                 .await
@@ -1131,7 +1131,7 @@ where
             self.driver_config
                 .signer
                 .send_transaction_request(
-                    self.driver_config.fetcher.as_ref().rpc_config.l1_rpc.clone(),
+                    self.driver_config.fetcher.as_ref().rpc_config.l1_rpc_client(),
                     transaction_request,
                 )
                 .await?

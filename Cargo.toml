@@ -217,3 +217,26 @@ substrate-bn = { git = "https://github.com/sp1-patches/bn", tag = "patch-0.6.0-s
 sha3 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha3", tag = "patch-sha3-0.10.8-sp1-4.0.0" }
 p256 = { git = "https://github.com/sp1-patches/elliptic-curves", tag = "patch-p256-13.2-sp1-5.0.0" }
 k256 = { git = "https://github.com/sp1-patches/elliptic-curves", tag = "patch-k256-13.4-sp1-5.0.0" }
+
+[patch."https://github.com/op-rs/kona"]
+kona-cli = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-client = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-derive = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-disc = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-driver = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-engine = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-executor = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-genesis = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-gossip = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-host = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-macros = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-mpt = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-peers = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-preimage = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-proof = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-protocol = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-providers-alloy = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-registry = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-rpc = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-std-fpvm = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
+kona-std-fpvm-proc = { git = "https://github.com/kien-rise/kona", rev = "416406a12f0e540cf835c4de97227d3046cadb0e" }
