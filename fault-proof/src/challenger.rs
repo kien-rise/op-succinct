@@ -47,6 +47,14 @@ where
         let challenger_bond = factory.fetch_challenger_bond(config.game_type).await?;
         let l2_rpc = config.l2_rpc.clone();
 
+        tracing::info!(
+            game_type = config.game_type,
+            challenger_bond = %challenger_bond,
+            fetch_interval = config.fetch_interval,
+            signer_address = ?signer.address(),
+            "Initializing OPSuccinctChallenger"
+        );
+
         Ok(OPSuccinctChallenger {
             config,
             signer,
@@ -113,6 +121,8 @@ where
     ///    - Games are evicted once finalized with no remaining credit or whenever resolves as
     ///      defender wins.
     async fn sync_state(&self) -> Result<()> {
+        tracing::info!("Starting state synchronization");
+
         // 1. Load new games.
         let mut next_index = {
             let state = self.state.lock().await;
@@ -125,8 +135,24 @@ where
         };
 
         let Some(latest_index) = self.factory.fetch_latest_game_index().await? else {
+            tracing::info!("No games found in factory");
             return Ok(());
         };
+
+        let num_new_games = if next_index <= latest_index {
+            (latest_index - next_index).to::<u64>() + 1
+        } else {
+            0
+        };
+
+        if num_new_games > 0 {
+            tracing::info!(
+                next_index = %next_index,
+                latest_index = %latest_index,
+                num_new_games,
+                "Loading new games from factory"
+            );
+        }
 
         while next_index <= latest_index {
             self.fetch_game(next_index).await?;
@@ -140,6 +166,8 @@ where
         };
 
         if !games.is_empty() {
+            tracing::info!(num_cached_games = games.len(), "Synchronizing status of cached games");
+
             let now_ts = self
                 .l1_provider
                 .get_block_by_number(BlockNumberOrTag::Latest)
@@ -183,6 +211,14 @@ where
                                 is_parent_challenger_wins(game.parent_index, &self.factory).await?;
 
                             if !is_game_over && (game.is_invalid || is_parent_challenger_wins) {
+                                tracing::info!(
+                                    game_index = %game.index,
+                                    game_address = ?game.address,
+                                    l2_block = %game.l2_block_number,
+                                    is_invalid = game.is_invalid,
+                                    is_parent_challenger_wins,
+                                    "Game marked for challenging"
+                                );
                                 actions.push(GameSyncAction::Update {
                                     index: game.index,
                                     status,
@@ -198,6 +234,12 @@ where
                             let is_own_game = claim_data.counteredBy == signer_address;
 
                             if is_game_over && is_parent_resolved && is_own_game {
+                                tracing::info!(
+                                    game_index = %game.index,
+                                    game_address = ?game.address,
+                                    l2_block = %game.l2_block_number,
+                                    "Game marked for resolution (game over, parent resolved, owned by us)"
+                                );
                                 actions.push(GameSyncAction::Update {
                                     index: game.index,
                                     status,
@@ -217,8 +259,21 @@ where
                         let credit = contract.credit(signer_address).call().await?;
 
                         if is_finalized && credit == U256::ZERO {
+                            tracing::info!(
+                                game_index = %game.index,
+                                game_address = ?game.address,
+                                "Game finalized with CHALLENGER_WINS and no remaining credit, removing from cache"
+                            );
                             actions.push(GameSyncAction::Remove(game.index));
                         } else {
+                            if is_finalized && credit > U256::ZERO {
+                                tracing::info!(
+                                    game_index = %game.index,
+                                    game_address = ?game.address,
+                                    credit = %credit,
+                                    "Game marked for bond claiming (finalized with credit)"
+                                );
+                            }
                             actions.push(GameSyncAction::Update {
                                 index: game.index,
                                 status,
@@ -230,6 +285,11 @@ where
                         }
                     }
                     GameStatus::DEFENDER_WINS => {
+                        tracing::info!(
+                            game_index = %game.index,
+                            game_address = ?game.address,
+                            "Game ended with DEFENDER_WINS, removing from cache"
+                        );
                         actions.push(GameSyncAction::Remove(game.index));
                     }
                     _ => unreachable!("Unexpected game status: {:?}", status),
@@ -262,6 +322,7 @@ where
             }
         }
 
+        tracing::info!("State synchronization completed");
         Ok(())
     }
 
@@ -269,6 +330,8 @@ where
     ///
     /// Drop game if the game type is invalid or the game was not respected at the time of creation.
     async fn fetch_game(&self, index: U256) -> Result<()> {
+        tracing::info!(game_index = %index, "Fetching game from factory");
+
         let game = self.factory.gameAtIndex(index).call().await?;
         let game_address = game.proxy;
         let contract = OPSuccinctFaultDisputeGame::new(game_address, self.l1_provider.clone());
@@ -287,6 +350,16 @@ where
             self.l2_provider.compute_output_root_at_block(l2_block_number).await?;
         let output_root = contract.rootClaim().call().await?;
         let claim_data = contract.claimData().call().await?;
+
+        tracing::info!(
+            game_index = %index,
+            ?game_address,
+            l2_block = %l2_block_number,
+            output_root = ?output_root,
+            computed_output_root = ?computed_output_root,
+            output_match = (output_root == computed_output_root),
+            "Validating game output root"
+        );
 
         let registry = AnchorStateRegistry::new(
             self.factory.get_anchor_state_registry_address(self.config.game_type).await?,
@@ -309,6 +382,17 @@ where
         let mut state = self.state.lock().await;
 
         if was_respected {
+            let is_invalid = output_root != computed_output_root;
+            tracing::info!(
+                game_index = %index,
+                ?game_address,
+                l2_block = %l2_block_number,
+                parent_index = claim_data.parentIndex,
+                is_invalid,
+                ?status,
+                proposal_status = ?claim_data.status,
+                "Game added to cache"
+            );
             state.games.insert(
                 index,
                 Game {
@@ -316,7 +400,7 @@ where
                     address: game_address,
                     parent_index: claim_data.parentIndex,
                     l2_block_number,
-                    is_invalid: output_root != computed_output_root,
+                    is_invalid,
                     status,
                     proposal_status: claim_data.status,
                     should_attempt_to_challenge: false,
@@ -354,7 +438,18 @@ where
                 .collect::<Vec<_>>()
         };
 
+        if !candidates.is_empty() {
+            tracing::info!(num_candidates = candidates.len(), "Found games to challenge");
+        }
+
         for game in candidates {
+            tracing::info!(
+                game_index = %game.index,
+                game_address = ?game.address,
+                l2_block = %game.l2_block_number,
+                is_invalid = game.is_invalid,
+                "Attempting to challenge game"
+            );
             if let Err(error) = self.submit_challenge_transaction(&game).await {
                 tracing::warn!(
                     game_index = %game.index,
@@ -463,7 +558,17 @@ where
                 .collect::<Vec<_>>()
         };
 
+        if !candidates.is_empty() {
+            tracing::info!(num_candidates = candidates.len(), "Found games to resolve");
+        }
+
         for game in candidates {
+            tracing::info!(
+                game_index = %game.index,
+                game_address = ?game.address,
+                l2_block = %game.l2_block_number,
+                "Attempting to resolve game"
+            );
             if let Err(error) = self.submit_resolution_transaction(&game).await {
                 tracing::warn!(
                     game_index = %game.index,
@@ -513,7 +618,17 @@ where
                 .collect::<Vec<_>>()
         };
 
+        if !candidates.is_empty() {
+            tracing::info!(num_candidates = candidates.len(), "Found bonds to claim");
+        }
+
         for game in candidates {
+            tracing::info!(
+                game_index = %game.index,
+                game_address = ?game.address,
+                l2_block = %game.l2_block_number,
+                "Attempting to claim bond"
+            );
             if let Err(error) = self.submit_bond_claim_transaction(&game).await {
                 tracing::warn!(
                     game_index = %game.index,
