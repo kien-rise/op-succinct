@@ -466,6 +466,8 @@ where
         };
 
         if !games.is_empty() {
+            tracing::info!(num_cached_games = games.len(), "Synchronizing status of cached games");
+
             let now_ts = self
                 .l1_provider
                 .get_block_by_number(BlockNumberOrTag::Latest)
@@ -508,6 +510,12 @@ where
                                 .honest_challenger_addresses
                                 .contains(&claim_data.counteredBy) =>
                     {
+                        tracing::info!(
+                            game_index = %index,
+                            game_address = ?game_address,
+                            countered_by = ?claim_data.counteredBy,
+                            "Game challenged by honest challenger, marking subtree for removal"
+                        );
                         actions.push(GameSyncAction::RemoveSubtree(index));
                     }
                     GameStatus::IN_PROGRESS => {
@@ -534,6 +542,15 @@ where
                             parent_resolved &&
                             is_game_over &&
                             is_own_game;
+
+                        if should_attempt_to_resolve {
+                            tracing::info!(
+                                game_index = %index,
+                                game_address = ?game_address,
+                                proposal_status = ?claim_data.status,
+                                "Game marked for resolution (parent resolved, game over, owned by us)"
+                            );
+                        }
 
                         actions.push(GameSyncAction::Update {
                             index,
@@ -581,6 +598,11 @@ where
                             };
 
                             if should_remove {
+                                tracing::info!(
+                                    game_index = %index,
+                                    game_address = ?game_address,
+                                    "Game finalized with DEFENDER_WINS and no credit, marking for removal"
+                                );
                                 actions.push(GameSyncAction::Remove(index));
                             } else {
                                 actions.push(GameSyncAction::Update {
@@ -593,6 +615,14 @@ where
                                 });
                             }
                         } else {
+                            if is_finalized && credit > U256::ZERO {
+                                tracing::info!(
+                                    game_index = %index,
+                                    game_address = ?game_address,
+                                    credit = %credit,
+                                    "Game marked for bond claiming (finalized with credit)"
+                                );
+                            }
                             actions.push(GameSyncAction::Update {
                                 index,
                                 status,
@@ -604,6 +634,11 @@ where
                         }
                     }
                     GameStatus::CHALLENGER_WINS => {
+                        tracing::info!(
+                            game_index = %index,
+                            game_address = ?game_address,
+                            "Game ended with CHALLENGER_WINS, marking subtree for removal"
+                        );
                         actions.push(GameSyncAction::RemoveSubtree(index));
                     }
                     _ => unreachable!("Unexpected game status: {:?}", status),
@@ -631,15 +666,20 @@ where
                     }
                     GameSyncAction::Remove(index) => {
                         state.games.remove(&index);
-                        tracing::debug!(game_index = %index, "Removed game from cache");
+                        tracing::info!(game_index = %index, "Removed game from cache");
                     }
                     GameSyncAction::RemoveSubtree(index) => {
+                        tracing::info!(
+                            game_index = %index,
+                            "Removing game and its entire subtree from cache"
+                        );
                         state.remove_subtree(index);
                     }
                 }
             }
         }
 
+        tracing::info!("Cached games synchronization completed");
         Ok(())
     }
 
