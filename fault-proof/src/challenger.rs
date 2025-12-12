@@ -513,6 +513,7 @@ where
                             let mut state = self.state.lock().await;
                             if let Some(game_state) = state.games.get_mut(&game.index) {
                                 game_state.should_attempt_to_challenge = false;
+                                game_state.proposal_status = ProposalStatus::Challenged;
                             }
                         }
                         ChallengerGauge::GamesChallenged.increment(1.0);
