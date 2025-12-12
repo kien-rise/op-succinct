@@ -388,14 +388,17 @@ where
                     state
                         .games
                         .values()
-                        .filter(|game| !game.should_attempt_to_challenge)
+                        .filter(|game| {
+                            !game.should_attempt_to_challenge &&
+                                game.proposal_status == ProposalStatus::Unchallenged
+                        })
                         .min_by_key(|game| game.index)
                         .cloned()
                 };
 
                 if let Some(game) = candidate {
                     tracing::warn!(
-                        "\x1b[31m[MALICIOUS CHALLENGE]\x1b[0m Attempting to challenge valid game {:?} at index {} for testing ({}% chance)",
+                        "😈 [MALICIOUS CHALLENGE] Attempting to challenge valid game {:?} at index {} for testing ({}% chance)",
                         game.address,
                         game.index,
                         self.config.malicious_challenge_percentage
