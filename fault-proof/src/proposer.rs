@@ -34,7 +34,7 @@ use tokio::{
 use crate::{
     config::ProposerConfig,
     contract::{
-        AnchorStateRegistry::AnchorStateRegistryInstance,
+        AnchorStateRegistry::{self, AnchorStateRegistryInstance},
         DisputeGameFactory::{DisputeGameCreated, DisputeGameFactoryInstance},
         GameStatus, OPSuccinctFaultDisputeGame, ProposalStatus,
     },
@@ -67,6 +67,16 @@ pub type TaskHandle = tokio::task::JoinHandle<Result<()>>;
 
 /// Type alias for a map of task IDs to their join handles and associated task info
 pub type TaskMap = HashMap<TaskId, (TaskHandle, TaskInfo)>;
+
+/// Errors that can occur when validating if a game claim can eventually be valid
+#[derive(Debug, Clone, Copy)]
+pub enum GameEventualValidityError {
+    NotRegistered,
+    Blacklisted,
+    Retired,
+    NotRespected,
+    ChallengerWins,
+}
 
 /// Information about a running task
 #[derive(Clone, Debug)]
@@ -1235,6 +1245,18 @@ where
             return Ok(GameFetchResult::InvalidGame { index });
         }
 
+        if let Some(e) = self.check_game_claim_eventual_validity(game_address).await? {
+            tracing::warn!(
+                game_index = %index,
+                ?game_address,
+                ?claim,
+                expected_output_root = ?output_root,
+                error = ?e,
+                "Invalid game: game claim cannot eventually be valid"
+            );
+            return Ok(GameFetchResult::InvalidGame { index });
+        }
+
         let does_rollup_config_match = {
             let expected = self.fetcher.rollup_config_hash.unwrap_or_default();
             let observed = contract.rollupConfigHash().call().await?;
@@ -1325,6 +1347,34 @@ where
         Ok(GameFetchResult::ValidGame { game_address, deadline })
     }
 
+    async fn check_game_claim_eventual_validity(
+        &self,
+        game_address: Address,
+    ) -> anyhow::Result<Option<GameEventualValidityError>> {
+        let registry = AnchorStateRegistry::new(
+            self.config.anchor_state_registry_address,
+            self.l1_provider.clone(),
+        );
+        if !registry.isGameRegistered(game_address).call().await? {
+            return Ok(Some(GameEventualValidityError::NotRegistered));
+        }
+        if registry.isGameBlacklisted(game_address).call().await? {
+            return Ok(Some(GameEventualValidityError::Blacklisted));
+        }
+        if registry.isGameRetired(game_address).call().await? {
+            return Ok(Some(GameEventualValidityError::Retired));
+        }
+        if !registry.isGameRespected(game_address).call().await? {
+            return Ok(Some(GameEventualValidityError::NotRespected));
+        }
+
+        let game = OPSuccinctFaultDisputeGame::new(game_address, self.l1_provider.clone());
+        if game.status().call().await? == GameStatus::CHALLENGER_WINS {
+            return Ok(Some(GameEventualValidityError::ChallengerWins));
+        }
+        Ok(None)
+    }
+
     /// Handles the creation of a new game if conditions are met.
     #[tracing::instrument(name = "[[Proposing]]", skip(self))]
     pub async fn handle_game_creation(
@@ -1348,6 +1398,17 @@ where
         // If there already exists a game at the next L2 block number for proposal, increment the L2
         // block number by 1
         while maybe_existing_game != Address::ZERO {
+            if self.check_game_claim_eventual_validity(maybe_existing_game).await?.is_none() {
+                tracing::warn!(
+                    l2_block_number = %next_l2_block_number_for_proposal,
+                    parent_game_index = %parent_game_index,
+                    output_root = ?output_root,
+                    game_address = ?maybe_existing_game,
+                    "Skipping game creation: game already exists and can eventually be a valid claim"
+                );
+                return Err(anyhow::anyhow!("Game already exists"))
+            }
+
             next_l2_block_number_for_proposal += U256::from(1);
             output_root = self
                 .l2_provider

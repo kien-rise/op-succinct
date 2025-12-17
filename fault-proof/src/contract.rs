@@ -135,6 +135,19 @@ sol! {
         /// @notice Returns the current anchor root.
         function getAnchorRoot() public view returns (Hash, uint256);
 
+        /// @notice Determines whether a game is registered by checking that it was created by the
+        ///         DisputeGameFactory and that it uses this AnchorStateRegistry.
+        function isGameRegistered(IDisputeGame _game) public view returns (bool);
+
+        /// @notice Determines whether a game is of a respected game type.
+        function isGameRespected(IDisputeGame _game) public view returns (bool);
+
+        /// @notice Determines whether a game is blacklisted.
+        function isGameBlacklisted(IDisputeGame _game) public view returns (bool);
+
+        /// @notice Determines whether a game is retired.
+        function isGameRetired(IDisputeGame _game) public view returns (bool);
+
         /// @notice Returns whether a game is finalized.
         function isGameFinalized(IDisputeGame _game) public view returns (bool);
 
