@@ -328,15 +328,15 @@ where
         loop {
             interval.tick().await;
 
-            // 1. Synchronize cached dispute state before scheduling work.
+            // 1. Handle completed tasks.
+            if let Err(e) = self.handle_completed_tasks().await {
+                tracing::warn!("Failed to handle completed tasks: {:?}", e);
+            }
+
+            // 2. Synchronize cached dispute state before scheduling work.
             if let Err(e) = self.sync_state().await {
                 tracing::warn!("Failed to sync proposer state: {:?}", e);
                 continue
-            }
-
-            // 2. Handle completed tasks.
-            if let Err(e) = self.handle_completed_tasks().await {
-                tracing::warn!("Failed to handle completed tasks: {:?}", e);
             }
 
             // 3. Spawn new work (non-blocking).
