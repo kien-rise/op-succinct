@@ -252,32 +252,30 @@ where
                         if proposal_status == ProposalStatus::Unchallenged {
                             let is_parent_challenger_wins =
                                 is_parent_challenger_wins(game.parent_index, &self.factory).await?;
-
-                            if !is_game_over && (game.is_invalid || is_parent_challenger_wins) {
-                                actions.push(GameSyncAction::Update {
-                                    index: game.index,
-                                    status,
-                                    proposal_status,
-                                    should_attempt_to_challenge: true,
-                                    should_attempt_to_resolve: false,
-                                    should_attempt_to_claim_bond: false,
-                                });
-                            }
+                            let should_attempt_to_challenge =
+                                !is_game_over && (game.is_invalid || is_parent_challenger_wins);
+                            actions.push(GameSyncAction::Update {
+                                index: game.index,
+                                status,
+                                proposal_status,
+                                should_attempt_to_challenge,
+                                should_attempt_to_resolve: false,
+                                should_attempt_to_claim_bond: false,
+                            });
                         } else if proposal_status == ProposalStatus::Challenged {
                             let is_parent_resolved =
                                 is_parent_resolved(game.parent_index, &self.factory).await?;
                             let is_own_game = claim_data.counteredBy == signer_address;
-
-                            if is_game_over && is_parent_resolved && is_own_game {
-                                actions.push(GameSyncAction::Update {
-                                    index: game.index,
-                                    status,
-                                    proposal_status,
-                                    should_attempt_to_challenge: false,
-                                    should_attempt_to_resolve: true,
-                                    should_attempt_to_claim_bond: false,
-                                });
-                            }
+                            let should_attempt_to_resolve =
+                                is_game_over && is_parent_resolved && is_own_game;
+                            actions.push(GameSyncAction::Update {
+                                index: game.index,
+                                status,
+                                proposal_status,
+                                should_attempt_to_challenge: false,
+                                should_attempt_to_resolve,
+                                should_attempt_to_claim_bond: false,
+                            });
                         }
                     }
                     GameStatus::CHALLENGER_WINS => {
@@ -288,13 +286,14 @@ where
                         if is_finalized && credit == U256::ZERO {
                             actions.push(GameSyncAction::Remove(game.index));
                         } else {
+                            let should_attempt_to_claim_bond = is_finalized && credit > U256::ZERO;
                             actions.push(GameSyncAction::Update {
                                 index: game.index,
                                 status,
                                 proposal_status,
                                 should_attempt_to_challenge: false,
                                 should_attempt_to_resolve: false,
-                                should_attempt_to_claim_bond: is_finalized && credit > U256::ZERO,
+                                should_attempt_to_claim_bond,
                             });
                         }
                     }
