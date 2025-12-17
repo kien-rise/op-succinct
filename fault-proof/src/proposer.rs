@@ -1353,6 +1353,42 @@ where
         Ok(GameFetchResult::ValidGame { game_address, deadline })
     }
 
+    async fn can_game_claim_eventually_be_valid(&self, game_address: Address) -> Result<bool> {
+        let registry = AnchorStateRegistry::new(
+            self.factory.get_anchor_state_registry_address(self.config.game_type).await?,
+            self.l1_provider.clone(),
+        );
+        if !registry.isGameRegistered(game_address).call().await? {
+            return Ok(false);
+        }
+        if !registry.isGameBlacklisted(game_address).call().await? {
+            return Ok(false);
+        }
+        if !registry.isGameRetired(game_address).call().await? {
+            return Ok(false);
+        }
+        if !registry.isGameRespected(game_address).call().await? {
+            return Ok(false);
+        }
+
+        let game = OPSuccinctFaultDisputeGame::new(game_address, self.l1_provider.clone());
+        match game.status().call().await? {
+            GameStatus::IN_PROGRESS => {
+                let claim_data = game.claimData().call().await?;
+                if !claim_data.counteredBy.is_zero() &&
+                    self.config.honest_challenger_addresses.contains(&claim_data.counteredBy)
+                {
+                    return Ok(false);
+                }
+            }
+            GameStatus::CHALLENGER_WINS => return Ok(false),
+            GameStatus::DEFENDER_WINS => {}
+            _ => return Ok(false),
+        };
+
+        Ok(true)
+    }
+
     /// Handles the creation of a new game if conditions are met.
     #[tracing::instrument(name = "[[Proposing]]", skip(self))]
     pub async fn handle_game_creation(
@@ -1376,6 +1412,17 @@ where
         // If there already exists a game at the next L2 block number for proposal, increment the L2
         // block number by 1
         while maybe_existing_game != Address::ZERO {
+            if self.can_game_claim_eventually_be_valid(maybe_existing_game).await? {
+                tracing::warn!(
+                    l2_block_number = %next_l2_block_number_for_proposal,
+                    parent_game_index = %parent_game_index,
+                    output_root = ?output_root,
+                    game_address = ?maybe_existing_game,
+                    "Game already exists and can eventually be a valid claim. Skipping game creation."
+                );
+                return Err(anyhow::anyhow!("Game already exists"))
+            }
+
             next_l2_block_number_for_proposal += U256::from(1);
             output_root = self
                 .l2_provider
