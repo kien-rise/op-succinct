@@ -209,8 +209,10 @@ where
                         if proposal_status == ProposalStatus::Unchallenged {
                             let is_parent_challenger_wins =
                                 is_parent_challenger_wins(game.parent_index, &self.factory).await?;
+                            let should_attempt_to_challenge =
+                                !is_game_over && (game.is_invalid || is_parent_challenger_wins);
 
-                            if !is_game_over && (game.is_invalid || is_parent_challenger_wins) {
+                            if should_attempt_to_challenge {
                                 tracing::info!(
                                     game_index = %game.index,
                                     game_address = ?game.address,
@@ -219,36 +221,40 @@ where
                                     is_parent_challenger_wins,
                                     "Game marked for challenging"
                                 );
-                                actions.push(GameSyncAction::Update {
-                                    index: game.index,
-                                    status,
-                                    proposal_status,
-                                    should_attempt_to_challenge: true,
-                                    should_attempt_to_resolve: false,
-                                    should_attempt_to_claim_bond: false,
-                                });
                             }
+
+                            actions.push(GameSyncAction::Update {
+                                index: game.index,
+                                status,
+                                proposal_status,
+                                should_attempt_to_challenge,
+                                should_attempt_to_resolve: false,
+                                should_attempt_to_claim_bond: false,
+                            });
                         } else if proposal_status == ProposalStatus::Challenged {
                             let is_parent_resolved =
                                 is_parent_resolved(game.parent_index, &self.factory).await?;
                             let is_own_game = claim_data.counteredBy == signer_address;
+                            let should_attempt_to_resolve =
+                                is_game_over && is_parent_resolved && is_own_game;
 
-                            if is_game_over && is_parent_resolved && is_own_game {
+                            if should_attempt_to_resolve {
                                 tracing::info!(
                                     game_index = %game.index,
                                     game_address = ?game.address,
                                     l2_block = %game.l2_block_number,
                                     "Game marked for resolution (game over, parent resolved, owned by us)"
                                 );
-                                actions.push(GameSyncAction::Update {
-                                    index: game.index,
-                                    status,
-                                    proposal_status,
-                                    should_attempt_to_challenge: false,
-                                    should_attempt_to_resolve: true,
-                                    should_attempt_to_claim_bond: false,
-                                });
                             }
+
+                            actions.push(GameSyncAction::Update {
+                                index: game.index,
+                                status,
+                                proposal_status,
+                                should_attempt_to_challenge: false,
+                                should_attempt_to_resolve,
+                                should_attempt_to_claim_bond: false,
+                            });
                         }
                     }
                     GameStatus::CHALLENGER_WINS => {
@@ -266,7 +272,8 @@ where
                             );
                             actions.push(GameSyncAction::Remove(game.index));
                         } else {
-                            if is_finalized && credit > U256::ZERO {
+                            let should_attempt_to_claim_bond = is_finalized && credit > U256::ZERO;
+                            if should_attempt_to_claim_bond {
                                 tracing::info!(
                                     game_index = %game.index,
                                     game_address = ?game.address,
@@ -280,7 +287,7 @@ where
                                 proposal_status,
                                 should_attempt_to_challenge: false,
                                 should_attempt_to_resolve: false,
-                                should_attempt_to_claim_bond: is_finalized && credit > U256::ZERO,
+                                should_attempt_to_claim_bond,
                             });
                         }
                     }
