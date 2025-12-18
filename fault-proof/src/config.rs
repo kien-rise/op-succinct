@@ -85,6 +85,9 @@ pub struct ProposerConfig {
     /// The gas limit to use for range proofs.
     pub range_gas_limit: u64,
 
+    /// The auction timeout for range proofs (in seconds).
+    pub range_auction_timeout: Option<u64>,
+
     /// The number of segments to split the range into (1-16).
     pub range_split_count: RangeSplitCount,
 
@@ -99,6 +102,9 @@ pub struct ProposerConfig {
 
     /// The gas limit to use for aggregation proofs.
     pub agg_gas_limit: u64,
+
+    /// The auction timeout for aggregation proofs (in seconds).
+    pub agg_auction_timeout: Option<u64>,
 
     /// The list of prover addresses that are allowed to bid on proof requests.
     pub whitelist: Option<Vec<Address>>,
@@ -185,6 +191,9 @@ impl ProposerConfig {
             range_gas_limit: env::var("RANGE_GAS_LIMIT")
                 .unwrap_or("1000000000000".to_string()) // 1 trillion
                 .parse()?,
+            range_auction_timeout: env::var("RANGE_AUCTION_TIMEOUT")
+                .ok()
+                .and_then(|v| v.parse().ok()),
             range_split_count: env::var("RANGE_SPLIT_COUNT").unwrap_or("1".to_string()).parse()?,
             max_concurrent_range_proofs: env::var("MAX_CONCURRENT_RANGE_PROOFS")
                 .unwrap_or("1".to_string())
@@ -195,6 +204,7 @@ impl ProposerConfig {
             agg_gas_limit: env::var("AGG_GAS_LIMIT")
                 .unwrap_or("1000000000000".to_string()) // 1 trillion
                 .parse()?,
+            agg_auction_timeout: env::var("AGG_AUCTION_TIMEOUT").ok().and_then(|v| v.parse().ok()),
             whitelist: parse_whitelist(&env::var("WHITELIST").unwrap_or("".to_string()))?,
         })
     }
@@ -223,10 +233,12 @@ impl ProposerConfig {
             timeout = self.timeout,
             range_cycle_limit = self.range_cycle_limit,
             range_gas_limit = self.range_gas_limit,
+            range_auction_timeout = ?self.range_auction_timeout,
             range_split_count = ?self.range_split_count,
             max_concurrent_range_proofs = ?self.max_concurrent_range_proofs,
             agg_cycle_limit = self.agg_cycle_limit,
             agg_gas_limit = self.agg_gas_limit,
+            agg_auction_timeout = ?self.agg_auction_timeout,
             whitelist = ?self.whitelist,
             "Proposer configuration loaded"
         );
