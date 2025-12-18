@@ -58,6 +58,7 @@ clap = { workspace = true, features = ["derive"] }
 dotenv.workspace = true
 futures.workspace = true
 kona-host.workspace = true
+lru.workspace = true
 rand = "0.9"
 serde.workspace = true
 tokio.workspace = true

@@ -176,6 +176,12 @@ pub struct ProposerStateSnapshot {
     pub games: Vec<(U256, Address)>,
 }
 
+#[derive(Debug, Clone)]
+enum CachedRangeProof {
+    SP1Stdin(SP1Stdin),
+    SP1ProofWithPublicValues(SP1ProofWithPublicValues),
+}
+
 #[derive(Clone)]
 pub struct OPSuccinctProposer<P, H: OPSuccinctHost>
 where
@@ -195,6 +201,7 @@ where
     tasks: Arc<Mutex<TaskMap>>,
     next_task_id: Arc<AtomicU64>,
     state: Arc<RwLock<ProposerState>>,
+    cached_range_proofs: Arc<Mutex<lru::LruCache<(u64, u64, B256), CachedRangeProof>>>,
 }
 
 impl<P, H> OPSuccinctProposer<P, H>
@@ -233,6 +240,11 @@ where
 
         let initial_state =
             ProposerState { canonical_head_l2_block: Some(anchor_l2_block), ..Default::default() };
+        let cache_capacity = std::num::NonZeroUsize::new(
+            ((config.fast_finality_proving_limit + 1) as usize) *
+                config.range_split_count.to_usize(),
+        )
+        .unwrap();
 
         Ok(Self {
             config: config.clone(),
@@ -255,6 +267,7 @@ where
             tasks: Arc::new(Mutex::new(HashMap::new())),
             next_task_id: Arc::new(AtomicU64::new(1)),
             state: Arc::new(RwLock::new(initial_state)),
+            cached_range_proofs: Arc::new(Mutex::new(lru::LruCache::new(cache_capacity))),
         })
     }
 
@@ -775,36 +788,26 @@ where
             let this = self.clone();
             async move {
                 tracing::info!("Generating Range Proof for blocks {start} to {end}");
-                let sp1_stdin = this.range_proof_stdin(start, end, l1_head_hash.into()).await?;
-                let (range_proof, inst_cycles, sp1_gas) =
-                    this.range_proof_request(&sp1_stdin).await?;
-                Ok::<_, anyhow::Error>((idx, range_proof, inst_cycles, sp1_gas))
+                let range_proof = this.cached_range_proof(start, end, l1_head_hash.into()).await?;
+                Ok::<_, anyhow::Error>((idx, range_proof))
             }
         });
 
         let max_concurrent = self.config.max_concurrent_range_proofs.get().min(num_ranges);
         let prove_stream = stream::iter(tasks);
-        let results: Vec<(usize, SP1ProofWithPublicValues, u64, u64)> =
+        let results: Vec<(usize, SP1ProofWithPublicValues)> =
             prove_stream.buffer_unordered(max_concurrent).try_collect().await?;
 
         let mut proofs = vec![None; num_ranges];
         let mut boot_infos = vec![None; num_ranges];
-        let mut total_instruction_cycles: u64 = 0;
-        let mut total_sp1_gas: u64 = 0;
 
-        for (idx, range_proof, inst_cycles, sp1_gas) in results {
+        for (idx, range_proof) in results {
             let proof = range_proof.proof.clone();
             let mut public_values = range_proof.public_values.clone();
             let boot_info: BootInfoStruct = public_values.read();
 
             proofs[idx] = Some(proof);
             boot_infos[idx] = Some(boot_info);
-            total_instruction_cycles = total_instruction_cycles
-                .checked_add(inst_cycles)
-                .ok_or_else(|| anyhow::anyhow!("Instruction cycles overflow"))?;
-            total_sp1_gas = total_sp1_gas
-                .checked_add(sp1_gas)
-                .ok_or_else(|| anyhow::anyhow!("SP1 gas overflow"))?;
         }
 
         let proofs = proofs
@@ -850,8 +853,32 @@ where
         };
 
         let tx_hash = self.agg_proof_request(&game, &sp1_stdin).await?;
+        Ok((tx_hash, 0, 0))
+    }
 
-        Ok((tx_hash, total_instruction_cycles, total_sp1_gas))
+    async fn cached_range_proof(
+        &self,
+        start_block: u64,
+        end_block: u64,
+        l1_head_hash: B256,
+    ) -> Result<SP1ProofWithPublicValues> {
+        let cache_key = (start_block, end_block, l1_head_hash);
+        let sp1_stdin = match self.cached_range_proofs.lock().await.get(&cache_key).cloned() {
+            Some(CachedRangeProof::SP1ProofWithPublicValues(sp1_proof)) => return Ok(sp1_proof),
+            Some(CachedRangeProof::SP1Stdin(sp1_stdin)) => sp1_stdin,
+            None => {
+                let sp1_stdin =
+                    self.range_proof_stdin(start_block, end_block, l1_head_hash.into()).await?;
+                (self.cached_range_proofs.lock().await)
+                    .push(cache_key, CachedRangeProof::SP1Stdin(sp1_stdin.clone()));
+                sp1_stdin
+            }
+        };
+
+        let sp1_proof = self.range_proof_request(&sp1_stdin).await?;
+        (self.cached_range_proofs.lock().await)
+            .push(cache_key, CachedRangeProof::SP1ProofWithPublicValues(sp1_proof.clone()));
+        Ok(sp1_proof)
     }
 
     async fn range_proof_stdin(
@@ -879,10 +906,7 @@ where
         Ok(sp1_stdin)
     }
 
-    async fn range_proof_request(
-        &self,
-        sp1_stdin: &SP1Stdin,
-    ) -> Result<(SP1ProofWithPublicValues, u64, u64)> {
+    async fn range_proof_request(&self, sp1_stdin: &SP1Stdin) -> Result<SP1ProofWithPublicValues> {
         if self.config.mock_mode {
             tracing::info!("Using mock mode for range proof generation");
             let (public_values, report) = self
@@ -915,7 +939,7 @@ where
                 SP1_CIRCUIT_VERSION,
             );
 
-            Ok((proof, total_instruction_cycles, total_sp1_gas))
+            Ok(proof)
         } else {
             // In network mode, we don't have access to execution stats
             let mut proof_builder = self
@@ -947,7 +971,7 @@ where
             }
 
             let proof = proof_builder.run_async().await?;
-            Ok((proof, 0, 0))
+            Ok(proof)
         }
     }
 

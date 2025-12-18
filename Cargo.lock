@@ -8648,6 +8648,7 @@ dependencies = [
  "futures",
  "hex",
  "kona-host",
+ "lru 0.16.2",
  "op-alloy-network",
  "op-alloy-rpc-types",
  "op-succinct-bindings",
