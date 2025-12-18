@@ -942,6 +942,10 @@ where
                 proof_builder = proof_builder.skip_simulation(false);
             }
 
+            if let Some(auction_timeout) = self.config.range_auction_timeout {
+                proof_builder = proof_builder.auction_timeout(Duration::from_secs(auction_timeout));
+            }
+
             let proof = proof_builder.run_async().await?;
             Ok((proof, 0, 0))
         }
@@ -992,6 +996,10 @@ where
                     "agg_cycle_limit and agg_gas_limit must both be zero or both be non-zero"
                 );
                 proof_builder = proof_builder.skip_simulation(false);
+            }
+
+            if let Some(auction_timeout) = self.config.agg_auction_timeout {
+                proof_builder = proof_builder.auction_timeout(Duration::from_secs(auction_timeout));
             }
 
             proof_builder.run_async().await?
