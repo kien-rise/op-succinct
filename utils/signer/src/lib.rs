@@ -151,7 +151,10 @@ impl Signer {
                 let receipt = provider
                     .send_transaction(transaction_request)
                     .await
-                    .context(format!("Failed to send transaction: {:?}", transaction_request_cloned))?
+                    .context(format!(
+                        "Failed to send transaction: {:?}",
+                        transaction_request_cloned
+                    ))?
                     .with_required_confirmations(NUM_CONFIRMATIONS)
                     .with_timeout(Some(Duration::from_secs(TIMEOUT_SECONDS)))
                     .get_receipt()
