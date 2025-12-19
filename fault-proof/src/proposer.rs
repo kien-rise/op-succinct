@@ -896,8 +896,20 @@ where
     ) -> Result<SP1Stdin> {
         let key: Bytes = serde_cbor::to_vec(&(start_block, end_block, l1_head_hash))?.into();
         if let Some(result) = self.proof_cache.lock().await.range_proof_stdin.get(&key) {
+            tracing::info!(
+                "Cache hit for range_proof_stdin: blocks {}..{}, l1_head={:?}",
+                start_block,
+                end_block,
+                l1_head_hash
+            );
             return Ok(result.clone());
         }
+        tracing::info!(
+            "Cache miss for range_proof_stdin: blocks {}..{}, l1_head={:?}",
+            start_block,
+            end_block,
+            l1_head_hash
+        );
         let result = self.range_proof_stdin(start_block, end_block, l1_head_hash).await?;
         self.proof_cache.lock().await.range_proof_stdin.push(key, result.clone());
         Ok(result)
@@ -934,8 +946,10 @@ where
     ) -> Result<(SP1ProofWithPublicValues, u64, u64)> {
         let key: Bytes = serde_cbor::to_vec(&sp1_stdin)?.into();
         if let Some(result) = self.proof_cache.lock().await.range_proof_request.get(&key) {
+            tracing::info!("Cache hit for range_proof_request");
             return Ok((result.clone(), 0, 0));
         }
+        tracing::info!("Cache miss for range_proof_request, generating proof...");
         let (result, _, _) = self.range_proof_request(sp1_stdin).await?;
         self.proof_cache.lock().await.range_proof_request.push(key, result.clone());
         Ok((result, 0, 0))
@@ -1033,9 +1047,19 @@ where
         .into();
 
         if let Some(result) = self.proof_cache.lock().await.agg_proof_stdin.get(&key) {
+            tracing::info!(
+                "Cache hit for agg_proof_stdin: {} proofs, prover={:?}",
+                proofs.len(),
+                prover_address
+            );
             return Ok(result.clone());
         }
 
+        tracing::info!(
+            "Cache miss for agg_proof_stdin: {} proofs, prover={:?}",
+            proofs.len(),
+            prover_address
+        );
         let result = get_agg_proof_stdin(
             proofs,
             boot_infos,
@@ -1054,8 +1078,10 @@ where
     ) -> Result<SP1ProofWithPublicValues> {
         let key: Bytes = serde_cbor::to_vec(&sp1_stdin)?.into();
         if let Some(result) = self.proof_cache.lock().await.agg_proof_request.get(&key) {
+            tracing::info!("Cache hit for agg_proof_request");
             return Ok(result.clone());
         }
+        tracing::info!("Cache miss for agg_proof_request, generating proof...");
         let result = self.agg_proof_request(sp1_stdin).await?;
         self.proof_cache.lock().await.agg_proof_request.push(key, result.clone());
         Ok(result)
