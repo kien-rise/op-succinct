@@ -862,22 +862,53 @@ where
         end_block: u64,
         l1_head_hash: B256,
     ) -> Result<SP1ProofWithPublicValues> {
+        tracing::info!(
+            start_block = start_block,
+            end_block = end_block,
+            l1_head_hash = ?l1_head_hash,
+            "cached_range_proof: Starting range proof generation"
+        );
+
         let cache_key = (start_block, end_block, l1_head_hash);
-        let sp1_stdin = match self.cached_range_proofs.lock().await.get(&cache_key).cloned() {
-            Some(CachedRangeProof::SP1ProofWithPublicValues(sp1_proof)) => return Ok(sp1_proof),
-            Some(CachedRangeProof::SP1Stdin(sp1_stdin)) => sp1_stdin,
-            None => {
+
+        {
+            tracing::info!(cache_key = ?cache_key, "cached_range_proof: Checking cache for SP1ProofWithPublicValues");
+            let mut cache = self.cached_range_proofs.lock().await;
+            if let Some(CachedRangeProof::SP1ProofWithPublicValues(sp1_proof)) =
+                cache.get(&cache_key)
+            {
+                tracing::info!(cache_key = ?cache_key, "cached_range_proof: Cache hit for SP1ProofWithPublicValues - returning cached proof");
+                return Ok(sp1_proof.clone());
+            }
+            tracing::info!(cache_key = ?cache_key, "cached_range_proof: Cache miss for SP1ProofWithPublicValues");
+        }
+
+        let sp1_stdin = {
+            tracing::info!(cache_key = ?cache_key, "cached_range_proof: Checking cache for SP1Stdin");
+            let cache_value = {
+                let mut cache = self.cached_range_proofs.lock().await;
+                cache.get(&cache_key).cloned()
+            };
+            if let Some(CachedRangeProof::SP1Stdin(sp1_stdin)) = cache_value {
+                tracing::info!(cache_key = ?cache_key, "cached_range_proof: Cache hit for SP1Stdin - using cached stdin");
+                sp1_stdin
+            } else {
+                tracing::info!(cache_key = ?cache_key, "cached_range_proof: Cache miss for SP1Stdin - generating new stdin");
                 let sp1_stdin =
                     self.range_proof_stdin(start_block, end_block, l1_head_hash.into()).await?;
+                tracing::info!(cache_key = ?cache_key, "cached_range_proof: Successfully generated SP1Stdin - adding to cache");
                 (self.cached_range_proofs.lock().await)
                     .push(cache_key, CachedRangeProof::SP1Stdin(sp1_stdin.clone()));
                 sp1_stdin
             }
         };
 
+        tracing::info!(cache_key = ?cache_key, "cached_range_proof: Requesting range proof with SP1Stdin");
         let sp1_proof = self.range_proof_request(&sp1_stdin).await?;
+        tracing::info!(cache_key = ?cache_key, "cached_range_proof: Successfully generated SP1ProofWithPublicValues - adding to cache");
         (self.cached_range_proofs.lock().await)
             .push(cache_key, CachedRangeProof::SP1ProofWithPublicValues(sp1_proof.clone()));
+        tracing::info!(cache_key = ?cache_key, "cached_range_proof: Completed range proof generation");
         Ok(sp1_proof)
     }
 
