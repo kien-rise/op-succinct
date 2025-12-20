@@ -2,7 +2,6 @@ use std::env;
 
 use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
-use alloy_transport_http::reqwest::Url;
 use anyhow::Result;
 use clap::Parser;
 use fault_proof::{
@@ -39,8 +38,8 @@ async fn main() -> Result<()> {
 
     let challenger_signer = SignerLock::from_env().await?;
 
-    let l1_provider = ProviderBuilder::default()
-        .connect_http(env::var("L1_RPC").unwrap().parse::<Url>().unwrap());
+    let l1_provider =
+        ProviderBuilder::default().connect_client(challenger_config.l1_rpc_client.clone());
 
     let anchor_state_registry = AnchorStateRegistry::new(
         env::var("ANCHOR_STATE_REGISTRY_ADDRESS")

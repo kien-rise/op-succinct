@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
 
     let proposer_signer = SignerLock::from_env().await?;
 
-    let l1_provider = ProviderBuilder::new().connect_http(proposer_config.l1_rpc.clone());
+    let l1_provider = ProviderBuilder::new().connect_client(proposer_config.l1_rpc_client.clone());
 
     let anchor_state_registry = AnchorStateRegistry::new(
         proposer_config.anchor_state_registry_address,
