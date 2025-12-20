@@ -51,7 +51,14 @@ pub fn check_preimage(key: &PreimageKey, value: &[u8]) -> PreimageOracleResult<(
         PreimageKeyType::Precompile => unimplemented!("Precompile not supported in zkVM"),
         PreimageKeyType::Blob => unreachable!("Blob keys validated in blob witness"),
     } {
-        if key != &PreimageKey::new(expected_hash, key.key_type()) {
+        let computed_key = PreimageKey::new(expected_hash, key.key_type());
+        if key != &computed_key {
+            tracing::warn!(
+                key = ?key,
+                computed_key = ?computed_key,
+                expected_hash = ?expected_hash,
+                "preimage key does not match computed hash"
+            );
             return Err(PreimageOracleError::InvalidPreimageKey);
         }
     }
