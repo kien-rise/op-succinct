@@ -44,7 +44,9 @@ alloy-eips.workspace = true
 alloy-primitives.workspace = true
 alloy-provider.workspace = true
 alloy-rlp.workspace = true
+alloy-rpc-client.workspace = true
 alloy-sol-types.workspace = true
+alloy-transport.workspace = true
 
 # general
 anyhow.workspace = true

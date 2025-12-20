@@ -221,7 +221,7 @@ where
         let (range_pk, range_vk) = network_prover.setup(get_range_elf_embedded());
         let (agg_pk, agg_vk) = network_prover.setup(AGGREGATION_ELF);
 
-        let l1_provider = ProviderBuilder::default().connect_http(config.l1_rpc.clone());
+        let l1_provider = ProviderBuilder::default().connect_client(config.l1_rpc_client.clone());
         let l2_provider = ProviderBuilder::default().connect_http(config.l2_rpc.clone());
         let init_bond = factory.fetch_init_bond(config.game_type).await?;
 
@@ -1034,7 +1034,7 @@ where
 
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         Ok(receipt.transaction_hash)
@@ -1057,7 +1057,7 @@ where
 
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         let game_address = receipt
@@ -1158,7 +1158,7 @@ where
         let transaction_request = contract.resolve().into_transaction_request();
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         tracing::info!(
@@ -1180,7 +1180,7 @@ where
             contract.claimCredit(self.signer.address()).gas(200_000).into_transaction_request();
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         tracing::info!(

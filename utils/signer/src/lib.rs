@@ -5,6 +5,7 @@ use alloy_eips::Decodable2718;
 use alloy_network::{Ethereum, EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxKind};
 use alloy_provider::{Provider, ProviderBuilder, Web3Signer};
+use alloy_rpc_client::RpcClient;
 use alloy_rpc_types_eth::{TransactionReceipt, TransactionRequest};
 use alloy_signer::Signer as AlloySigner;
 use alloy_signer_gcp::{GcpKeyRingRef, GcpSigner, KeySpecifier};
@@ -96,7 +97,7 @@ impl Signer {
     /// Sends a transaction request, signed by the configured `signer`.
     pub async fn send_transaction_request(
         &self,
-        l1_rpc: Url,
+        l1_rpc_client: RpcClient,
         mut transaction_request: TransactionRequest,
     ) -> Result<TransactionReceipt> {
         match self {
@@ -105,7 +106,8 @@ impl Signer {
                 transaction_request.set_from(*signer_address);
 
                 // Fill the transaction request with all of the relevant gas and nonce information.
-                let provider = ProviderBuilder::new().network::<Ethereum>().connect_http(l1_rpc);
+                let provider =
+                    ProviderBuilder::new().network::<Ethereum>().connect_client(l1_rpc_client);
                 let filled_tx = provider.fill(transaction_request).await?;
 
                 // Sign the transaction request using the Web3Signer.
@@ -136,7 +138,7 @@ impl Signer {
                 let provider = ProviderBuilder::new()
                     .network::<Ethereum>()
                     .wallet(EthereumWallet::new(private_key.clone()))
-                    .connect_http(l1_rpc);
+                    .connect_client(l1_rpc_client);
 
                 // Ensure the request has a `from` address so the wallet filler can sign it.
                 transaction_request.set_from(private_key.address());
@@ -175,7 +177,7 @@ impl Signer {
                 let provider = ProviderBuilder::new()
                     .network::<Ethereum>()
                     .wallet(wallet)
-                    .connect_http(l1_rpc);
+                    .connect_client(l1_rpc_client);
 
                 let receipt = provider
                     .send_transaction(transaction_request)
@@ -221,11 +223,11 @@ impl SignerLock {
     /// Transactions are serialized via a Mutex to prevent nonce conflicts.
     pub async fn send_transaction_request(
         &self,
-        l1_rpc: Url,
+        l1_rpc_client: RpcClient,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionReceipt> {
         let signer = self.inner.lock().await;
-        signer.send_transaction_request(l1_rpc, transaction_request).await
+        signer.send_transaction_request(l1_rpc_client, transaction_request).await
     }
 }
 
@@ -261,7 +263,10 @@ mod tests {
             .into_transaction_request();
 
         let receipt = proposer_signer
-            .send_transaction_request("http://localhost:8545".parse().unwrap(), transaction_request)
+            .send_transaction_request(
+                RpcClient::new_http("http://localhost:8545".parse().unwrap()),
+                transaction_request,
+            )
             .await
             .unwrap();
 
@@ -289,7 +294,10 @@ mod tests {
             .value(U256::from(100000u64))
             .from(signer.address());
         let receipt = signer
-            .send_transaction_request("http://localhost:8545".parse().unwrap(), transaction_request)
+            .send_transaction_request(
+                RpcClient::new_http("http://localhost:8545".parse().unwrap()),
+                transaction_request,
+            )
             .await
             .unwrap();
         println!("Signed transaction receipt: {receipt:?}");
