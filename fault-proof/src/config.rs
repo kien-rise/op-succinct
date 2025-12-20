@@ -6,19 +6,20 @@ use std::{
 };
 
 use alloy_primitives::Address;
+use alloy_rpc_client::RpcClient;
 use alloy_transport_http::reqwest::Url;
 use anyhow::{bail, Result};
-use op_succinct_host_utils::network::parse_fulfillment_strategy;
+use op_succinct_host_utils::{fetcher::get_rpc_client, network::parse_fulfillment_strategy};
 use serde::{Deserialize, Serialize};
 use sp1_sdk::{network::FulfillmentStrategy, SP1ProofMode};
 
 #[derive(Debug, Clone)]
 pub struct ProposerConfig {
     /// The L1 RPC URL.
-    pub l1_rpc: Url,
+    pub l1_rpc_client: RpcClient,
 
-    /// The L2 RPC URL.
-    pub l2_rpc: Url,
+    /// The L2 RPC client.
+    pub l2_rpc_client: RpcClient,
 
     /// The address of the AnchorStateRegistry contract.
     pub anchor_state_registry_address: Address,
@@ -102,9 +103,15 @@ fn parse_whitelist(whitelist_str: &str) -> Result<Option<Vec<Address>>> {
 
 impl ProposerConfig {
     pub fn from_env() -> Result<Self> {
+        let l1_rpc_url: Url = env::var("L1_RPC")?.parse().expect("L1_RPC not set");
+        let l1_requests_per_second: Option<f64> =
+            env::var("L1_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
+        let l2_rpc_url: Url = env::var("L2_RPC")?.parse().expect("L2_RPC not set");
+        let l2_requests_per_second: Option<f64> =
+            env::var("L2_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
         Ok(Self {
-            l1_rpc: env::var("L1_RPC")?.parse().expect("L1_RPC not set"),
-            l2_rpc: env::var("L2_RPC")?.parse().expect("L2_RPC not set"),
+            l1_rpc_client: get_rpc_client(l1_rpc_url, l1_requests_per_second),
+            l2_rpc_client: get_rpc_client(l2_rpc_url, l2_requests_per_second),
             anchor_state_registry_address: env::var("ANCHOR_STATE_REGISTRY_ADDRESS")?
                 .parse()
                 .expect("ANCHOR_STATE_REGISTRY_ADDRESS not set"),
@@ -145,8 +152,8 @@ impl ProposerConfig {
     /// Log the configuration using structured tracing fields.
     pub fn log(&self) {
         tracing::info!(
-            l1_rpc = %self.l1_rpc,
-            l2_rpc = %self.l2_rpc,
+            l1_rpc = ?self.l1_rpc_client,
+            l2_rpc = ?self.l2_rpc_client,
             factory_address = %self.factory_address,
             mock_mode = self.mock_mode,
             fast_finality_mode = self.fast_finality_mode,
@@ -276,8 +283,8 @@ impl ProofProviderConfig {
 
 #[derive(Debug, Clone)]
 pub struct ChallengerConfig {
-    pub l1_rpc: Url,
-    pub l2_rpc: Url,
+    pub l1_rpc_client: RpcClient,
+    pub l2_rpc_client: RpcClient,
 
     /// The address of the AnchorStateRegistry contract.
     pub anchor_state_registry_address: Address,
@@ -301,9 +308,16 @@ pub struct ChallengerConfig {
 
 impl ChallengerConfig {
     pub fn from_env() -> Result<Self> {
+        let l1_requests_per_second: Option<f64> =
+            env::var("L1_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
+        let l1_rpc_url: Url = env::var("L1_RPC")?.parse().expect("L1_RPC not set");
+        let l2_rpc_url: Url = env::var("L2_RPC")?.parse().expect("L2_RPC not set");
+        let l2_requests_per_second: Option<f64> =
+            env::var("L2_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
+
         Ok(Self {
-            l1_rpc: env::var("L1_RPC")?.parse().expect("L1_RPC not set"),
-            l2_rpc: env::var("L2_RPC")?.parse().expect("L2_RPC not set"),
+            l1_rpc_client: get_rpc_client(l1_rpc_url, l1_requests_per_second),
+            l2_rpc_client: get_rpc_client(l2_rpc_url, l2_requests_per_second),
             anchor_state_registry_address: env::var("ANCHOR_STATE_REGISTRY_ADDRESS")?
                 .parse()
                 .expect("ANCHOR_STATE_REGISTRY_ADDRESS not set"),
@@ -322,8 +336,8 @@ impl ChallengerConfig {
     /// Log the configuration using structured tracing fields.
     pub fn log(&self) {
         tracing::info!(
-            l1_rpc = %self.l1_rpc,
-            l2_rpc = %self.l2_rpc,
+            l1_rpc = ?self.l1_rpc_client,
+            l2_rpc = ?self.l2_rpc_client,
             anchor_state_registry_address = %self.anchor_state_registry_address,
             factory_address = %self.factory_address,
             game_type = self.game_type,

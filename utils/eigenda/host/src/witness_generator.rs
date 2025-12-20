@@ -20,9 +20,12 @@ use op_succinct_client_utils::witness::{
     BlobData, EigenDAWitnessData,
 };
 use op_succinct_eigenda_client_utils::executor::EigenDAWitnessExecutor;
-use op_succinct_host_utils::witness_generation::{
-    online_blob_store::OnlineBlobStore, preimage_witness_collector::PreimageWitnessCollector,
-    DefaultOracleBase, WitnessGenerator,
+use op_succinct_host_utils::{
+    fetcher::get_rpc_client,
+    witness_generation::{
+        online_blob_store::OnlineBlobStore, preimage_witness_collector::PreimageWitnessCollector,
+        DefaultOracleBase, WitnessGenerator,
+    },
 };
 use rkyv::to_bytes;
 use sp1_core_executor::SP1ReduceProof;
@@ -140,17 +143,21 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
 
         // Generate canoe proofs using the reduced proof provider for proof aggregation
         use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
-        let eth_rpc_url = std::env::var("L1_RPC")
+        let l1_rpc_url = std::env::var("L1_RPC")
             .map_err(|_| anyhow::anyhow!("L1_RPC environment variable not set"))?;
+        let l1_requests_per_second: Option<f64> =
+            env::var("L1_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
+        let eth_rpc_client = get_rpc_client(l1_rpc_url.parse()?, l1_requests_per_second);
+
         let mock_mode = env::var("OP_SUCCINCT_MOCK")
             .unwrap_or("false".to_string())
             .parse::<bool>()
             .unwrap_or(false);
-        let canoe_provider = CanoeSp1CCReducedProofProvider { eth_rpc_url, mock_mode };
+        let canoe_provider = CanoeSp1CCReducedProofProvider { eth_rpc_client, mock_mode };
         let maybe_canoe_proof = hokulea_witgen::from_boot_info_to_canoe_proof(
             &boot_info,
             &eigenda_preimage_data,
-            oracle.clone(),
+            oracle.as_ref(),
             canoe_provider,
             CanoeVerifierAddressFetcherDeployedByEigenLabs {},
         )

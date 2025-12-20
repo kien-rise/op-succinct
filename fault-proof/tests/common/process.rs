@@ -11,7 +11,7 @@ use fault_proof::{
     proposer::OPSuccinctProposer,
 };
 use op_succinct_host_utils::{
-    fetcher::{OPSuccinctDataFetcher, RPCConfig},
+    fetcher::{get_rpc_client, OPSuccinctDataFetcher, RPCConfig},
     host::OPSuccinctHost,
 };
 use op_succinct_proof_utils::initialize_host;
@@ -32,8 +32,8 @@ pub async fn new_proposer(
 
     // Create proposer config with test-specific settings
     let config = fault_proof::config::ProposerConfig {
-        l1_rpc: rpc_config.l1_rpc.clone(),
-        l2_rpc: rpc_config.l2_rpc.clone(),
+        l1_rpc_client: get_rpc_client(rpc_config.l1_rpc.clone(), rpc_config.l1_requests_per_second),
+        l2_rpc_client: get_rpc_client(rpc_config.l2_rpc.clone(), rpc_config.l2_requests_per_second),
         anchor_state_registry_address: *anchor_state_registry_address,
         factory_address: *factory_address,
         mock_mode: true,
@@ -111,8 +111,8 @@ pub async fn new_challenger(
     let signer = SignerLock::new(op_succinct_signer_utils::Signer::new_local_signer(private_key)?);
 
     let config = ChallengerConfig {
-        l1_rpc: rpc_config.l1_rpc.clone(),
-        l2_rpc: rpc_config.l2_rpc.clone(),
+        l1_rpc_client: get_rpc_client(rpc_config.l1_rpc.clone(), rpc_config.l1_requests_per_second),
+        l2_rpc_client: get_rpc_client(rpc_config.l2_rpc.clone(), rpc_config.l2_requests_per_second),
         anchor_state_registry_address: *anchor_state_registry_address,
         factory_address: *factory_address,
         fetch_interval: 2,

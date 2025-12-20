@@ -298,8 +298,8 @@ where
             ))
         };
 
-        let l1_provider = ProviderBuilder::default().connect_http(config.l1_rpc.clone());
-        let l2_provider = ProviderBuilder::default().connect_http(config.l2_rpc.clone());
+        let l1_provider = ProviderBuilder::default().connect_client(config.l1_rpc_client.clone());
+        let l2_provider = ProviderBuilder::default().connect_client(config.l2_rpc_client.clone());
 
         let initial_state = ProposerState::default();
 
@@ -524,9 +524,9 @@ where
             .await?
             .ok_or_else(|| {
                 anyhow::anyhow!(
-                    "Cannot fetch finalized L2 block number from L2 RPC: {}\n\
+                    "Cannot fetch finalized L2 block number from L2 RPC: {:?}\n\
                      Please check that your L2 node is running and accessible.",
-                    config.l2_rpc
+                    config.l2_rpc_client
                 )
             })?;
 
@@ -1078,7 +1078,7 @@ where
         let transaction_request = game.prove(agg_proof.bytes().into()).into_transaction_request();
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         if !receipt.status() {
@@ -1216,7 +1216,7 @@ where
 
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         if !receipt.status() {
@@ -1342,7 +1342,7 @@ where
         let transaction_request = contract.resolve().into_transaction_request();
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         if !receipt.status() {
@@ -1368,7 +1368,7 @@ where
             contract.claimCredit(self.signer.address()).gas(200_000).into_transaction_request();
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         if !receipt.status() {

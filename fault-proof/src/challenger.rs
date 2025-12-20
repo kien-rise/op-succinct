@@ -51,13 +51,13 @@ where
         factory: DisputeGameFactoryInstance<P>,
         signer: SignerLock,
     ) -> Self {
-        let l2_rpc = config.l2_rpc.clone();
+        let l2_rpc_client = config.l2_rpc_client.clone();
 
         OPSuccinctChallenger {
             config,
             signer,
             l1_provider: l1_provider.clone(),
-            l2_provider: ProviderBuilder::default().connect_http(l2_rpc),
+            l2_provider: ProviderBuilder::default().connect_client(l2_rpc_client),
             anchor_state_registry,
             factory,
             challenger_bond: OnceLock::new(),
@@ -503,7 +503,7 @@ where
             contract.challenge().value(challenger_bond).into_transaction_request();
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         if !receipt.status() {
@@ -566,7 +566,7 @@ where
         let transaction_request = contract.resolve().into_transaction_request();
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         if !receipt.status() {
@@ -631,7 +631,7 @@ where
             contract.claimCredit(self.signer.address()).gas(200_000).into_transaction_request();
         let receipt = self
             .signer
-            .send_transaction_request(self.config.l1_rpc.clone(), transaction_request)
+            .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
             .await?;
 
         if !receipt.status() {
