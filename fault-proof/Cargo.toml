@@ -58,7 +58,9 @@ async-trait.workspace = true
 clap = { workspace = true, features = ["derive"] }
 dotenv.workspace = true
 futures.workspace = true
+kona-driver.workspace = true
 kona-host.workspace = true
+kona-proof.workspace = true
 lru.workspace = true
 rand = "0.9"
 serde.workspace = true

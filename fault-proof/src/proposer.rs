@@ -8,12 +8,14 @@ use std::{
 };
 
 use alloy_consensus::Header;
-use alloy_eips::BlockNumberOrTag;
+use alloy_eips::{BlockNumHash, BlockNumberOrTag};
 use alloy_primitives::{Address, Bytes, FixedBytes, TxHash, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_sol_types::{SolEvent, SolValue};
 use anyhow::{bail, Context, Result};
 use futures::stream::{self, StreamExt, TryStreamExt};
+use kona_driver::PipelineCursor;
+use kona_proof::{executor::KonaExecutor, sync::new_oracle_pipeline_cursor};
 use lru::LruCache;
 use op_succinct_client_utils::boot::BootInfoStruct;
 use op_succinct_elfs::AGGREGATION_ELF;
@@ -124,7 +126,7 @@ pub struct Game {
 /// - `games`: cached metadata for every tracked game keyed by index
 #[derive(Default)]
 struct ProposerState {
-    anchor_game: Option<Game>,
+    anchor_root: BlockNumHash,
     canonical_head_index: Option<U256>,
     canonical_head_l2_block: Option<U256>,
     cursor: Cursor,
@@ -136,9 +138,20 @@ impl ProposerState {
     ///
     /// NOTE(fakedev9999): If this becomes hot, consider maintaining an adjacency index
     /// `parent -> Vec<child>`.
-    fn descendants_of(&self, root_index: U256) -> HashSet<U256> {
-        let mut reachable: HashSet<U256> = HashSet::new();
-        let mut stack = vec![root_index];
+    fn descendants_of(&self, root_index: Option<U256>) -> HashSet<U256> {
+        let mut reachable = HashSet::new();
+        let mut stack = Vec::new();
+
+        if let Some(root_index) = root_index {
+            stack.push(root_index);
+        } else {
+            for game in self.games.values() {
+                if game.parent_index == u32::MAX {
+                    reachable.insert(game.index);
+                    stack.push(game.index);
+                }
+            }
+        }
 
         while let Some(index) = stack.pop() {
             if reachable.insert(index) {
@@ -160,7 +173,7 @@ impl ProposerState {
     /// dropped.
     fn remove_subtree(&mut self, root_index: U256) {
         tracing::info!(?root_index, "Removing subtree from cache");
-        for index in self.descendants_of(root_index) {
+        for index in self.descendants_of(Some(root_index)) {
             tracing::info!(?index, "Removing game from cache");
             self.games.remove(&index);
         }
@@ -170,7 +183,7 @@ impl ProposerState {
 /// Snapshot of the proposer's cached state for testing and monitoring.
 #[derive(Clone, Debug)]
 pub struct ProposerStateSnapshot {
-    pub anchor_index: Option<U256>,
+    pub anchor_root: BlockNumHash,
     pub canonical_head_index: Option<U256>,
     pub canonical_head_l2_block: U256,
     pub games: Vec<(U256, Address)>,
@@ -245,13 +258,17 @@ where
         let init_bond = factory.fetch_init_bond(config.game_type).await?;
 
         // Initialize state with anchor L2 block number
-        let anchor_l2_block = factory.get_anchor_l2_block_number(config.game_type).await?;
+        let anchor_root = factory.get_anchor_root(config.game_type).await?;
 
-        Self::validate_anchor_l2_block(anchor_l2_block, &config, host.as_ref(), fetcher.as_ref())
-            .await?;
+        Self::validate_anchor_l2_block(
+            anchor_root.number,
+            &config,
+            host.as_ref(),
+            fetcher.as_ref(),
+        )
+        .await?;
 
-        let initial_state =
-            ProposerState { canonical_head_l2_block: Some(anchor_l2_block), ..Default::default() };
+        let initial_state = ProposerState { anchor_root, ..Default::default() };
 
         Ok(Self {
             config: config.clone(),
@@ -283,13 +300,13 @@ where
     }
 
     async fn validate_anchor_l2_block(
-        anchor_l2_block: U256,
+        anchor_l2_block: u64,
         config: &ProposerConfig,
         host: &H,
         fetcher: &OPSuccinctDataFetcher,
     ) -> Result<()> {
         let finalized_l2_block = host
-            .get_finalized_l2_block_number(fetcher, anchor_l2_block.to::<u64>())
+            .get_finalized_l2_block_number(fetcher, anchor_l2_block)
             .await?
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -299,7 +316,7 @@ where
                 )
             })?;
 
-        if anchor_l2_block > U256::from(finalized_l2_block) {
+        if anchor_l2_block > finalized_l2_block {
             return Err(anyhow::anyhow!(
                 "Contract misconfiguration detected: Contract's anchor L2 block ({}) is ahead of \
                  the current finalized L2 block ({}). This indicates:\n\
@@ -319,7 +336,7 @@ where
     pub async fn state_snapshot(&self) -> ProposerStateSnapshot {
         let state = self.state.read().await;
         ProposerStateSnapshot {
-            anchor_index: state.anchor_game.as_ref().map(|game| game.index),
+            anchor_root: state.anchor_root.clone(),
             canonical_head_index: state.canonical_head_index,
             canonical_head_l2_block: state.canonical_head_l2_block.unwrap_or(U256::ZERO),
             games: state.games.values().map(|game| (game.index, game.address)).collect(),
@@ -395,7 +412,7 @@ where
         self.sync_games().await?;
 
         // Align anchor information after the cached game statuses have been synchronized.
-        self.sync_anchor_game().await?;
+        self.sync_anchor_root().await?;
 
         // With the cached game statuses and anchor synchronized, recompute the canonical head.
         self.compute_canonical_head().await;
@@ -688,25 +705,15 @@ where
         Ok(())
     }
 
-    /// Synchronizes the anchor game from the factory.
-    async fn sync_anchor_game(&self) -> Result<()> {
-        let anchor_game = self.factory.get_anchor_game(self.config.game_type).await?;
-        let anchor_address = anchor_game.address();
-
-        if *anchor_address != Address::ZERO {
-            let mut state = self.state.write().await;
-
-            // Fetch the anchor game from the cache.
-            if let Some((_, anchor_game)) =
-                state.games.iter().find(|(_, game)| game.address == *anchor_address)
-            {
-                state.anchor_game = Some(anchor_game.clone());
-                tracing::debug!(?anchor_address, "Anchor game updated in cache");
-            } else {
-                tracing::debug!(?anchor_address, "Anchor game not in cache yet");
-            }
-        }
-
+    /// Synchronizes the anchor root
+    async fn sync_anchor_root(&self) -> Result<()> {
+        let anchor_state_registry_address =
+            self.factory.get_anchor_state_registry_address(self.config.game_type).await?;
+        let anchor_state_registry =
+            AnchorStateRegistry::new(anchor_state_registry_address, self.l1_provider.clone());
+        let (hash, number) = anchor_state_registry.getAnchorRoot().call().await?.into();
+        let mut state = self.state.write().await;
+        state.anchor_root = BlockNumHash::new(number.to(), hash);
         Ok(())
     }
 
@@ -719,35 +726,15 @@ where
     async fn compute_canonical_head(&self) {
         let mut state = self.state.write().await;
 
-        let canonical_head = match state.anchor_game.as_ref() {
-            None => state.games.values().max_by_key(|g| g.l2_block).cloned(),
-            Some(anchor_game) => {
-                let reachable = state.descendants_of(anchor_game.index);
+        let reachable = state.descendants_of(None);
 
-                // Best among descendants
-                let anchor_head = state
-                    .games
-                    .values()
-                    .filter(|g| reachable.contains(&g.index))
-                    .max_by_key(|g| g.l2_block);
-
-                // Check non-descendants for override (higher block with genesis or lower parent)
-                let override_head = anchor_head.and_then(|anchor| {
-                    state
-                        .games
-                        .values()
-                        .filter(|g| !reachable.contains(&g.index))
-                        .filter(|g| {
-                            g.l2_block > anchor.l2_block &&
-                                (g.parent_index == u32::MAX ||
-                                    g.parent_index < anchor.parent_index)
-                        })
-                        .max_by_key(|g| g.l2_block)
-                });
-
-                override_head.or(anchor_head).cloned()
-            }
-        };
+        // Best among descendants
+        let canonical_head = state
+            .games
+            .values()
+            .filter(|g| reachable.contains(&g.index))
+            .max_by_key(|g| g.l2_block)
+            .cloned();
 
         let previous_canonical_index = state.canonical_head_index;
 
@@ -767,6 +754,7 @@ where
         } else {
             // Clear stale canonical head index when no valid games exist.
             state.canonical_head_index = None;
+            state.canonical_head_l2_block = Some(U256::from(state.anchor_root.number));
 
             if previous_canonical_index.is_some() {
                 tracing::info!(
@@ -1579,9 +1567,9 @@ where
 
     /// Fetch the proposer metrics.
     async fn fetch_proposer_metrics(&self) -> Result<()> {
-        let (canonical_head_l2_block, anchor_game) = {
+        let (canonical_head_l2_block, anchor_root) = {
             let state = self.state.read().await;
-            (state.canonical_head_l2_block, state.anchor_game.clone())
+            (state.canonical_head_l2_block, state.anchor_root.clone())
         };
 
         if let Some(canonical_head_l2_block) = canonical_head_l2_block {
@@ -1595,11 +1583,7 @@ where
                 ProposerGauge::FinalizedL2BlockNumber.set(finalized_l2_block_number as f64);
             }
 
-            if let Some(anchor_game) = anchor_game {
-                ProposerGauge::AnchorGameL2BlockNumber.set(anchor_game.l2_block.to::<u64>() as f64);
-            } else {
-                ProposerGauge::AnchorGameL2BlockNumber.set(0.0);
-            }
+            ProposerGauge::AnchorGameL2BlockNumber.set(anchor_root.number as f64);
         } else {
             tracing::warn!("canonical_head_l2_block is None; skipping metrics update");
         }
@@ -1824,6 +1808,64 @@ where
         );
         Ok(true)
     }
+
+    // async fn next_game(&self) -> Result<Option<(U256, u32)>> {
+    //     let (canonical_head_l2_block, parent_game_index) = {
+    //         let state = self.state.read().await;
+    //         if let (Some(b), Some(i)) = (state.canonical_head_l2_block,
+    // state.canonical_head_index) {             (b, i)
+    //         } else {
+    //             return Ok(None)
+    //         }
+
+    //         let Some(canonical_head_l2_block) = state.canonical_head_l2_block else {
+    //             tracing::info!("No canonical head; skipping game creation");
+    //             return Ok((false, U256::ZERO, u32::MAX));
+    //         };
+
+    //         let canonical_head_index =
+    //             state.canonical_head_index.map(|index| index.to::<u32>()).unwrap_or(u32::MAX);
+
+    //         (canonical_head_l2_block, parent_game_index)
+    //     };
+
+    //     let rollup_config = self.fetcher.rollup_config.ok_or_else(|| anyhow::anyhow!("missing
+    // rollup config"))?;     let safe_header = self.l2_provider
+    //         .header_by_hash(safe_head_hash)
+    //         .map(|header| Sealed::new_unchecked(header, safe_head_hash))?;
+    //     let cursor = new_oracle_pipeline_cursor(rollup_config, safe_header,
+    // self.l1_provider.clone(), self.l2_provider.clone()).await;
+
+    //     // let channel_timeout =
+    // rollup_config.channel_timeout(safe_head_info.block_info.timestamp);
+
+    //     // let mut l1_origin_number = l1_origin.number.saturating_sub(channel_timeout);
+    //     // if l1_origin_number < rollup_config.genesis.l1.number {
+    //     //     l1_origin_number = rollup_config.genesis.l1.number;
+    //     // }
+    //     // let origin = chain_provider.block_info_by_number(l1_origin_number).await?;
+
+    //     // let mut cursor = PipelineCursor::new(channel_timeout, origin);
+
+    //     let executor = KonaExecutor::new(
+    //         rollup_config.as_ref(),
+    //         l2_provider.clone(),
+    //         l2_provider,
+    //         ZkvmOpEvmFactory::new(),
+    //         None,
+    //     );
+
+    //     let mut driver = Driver::new(cursor, executor, pipeline);
+
+    //     let (safe_head, output_root) = advance_to_target( // here
+    //         &mut driver,
+    //         rollup_config.as_ref(),
+    //         Some(boot.claimed_l2_block_number),
+    //     )
+    //     .await?;
+
+    //     Err(())
+    // }
 
     /// Check if we should create a game
     ///

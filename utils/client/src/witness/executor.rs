@@ -144,7 +144,7 @@ pub trait WitnessExecutor {
         // Use custom advance to target with cycle tracking.
         #[cfg(target_os = "zkvm")]
         println!("cycle-tracker-report-start: block-execution-and-derivation");
-        let (safe_head, output_root) = advance_to_target(
+        let (safe_head, output_root) = advance_to_target( // here
             &mut driver,
             rollup_config.as_ref(),
             Some(boot.claimed_l2_block_number),
