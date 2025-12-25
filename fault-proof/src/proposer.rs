@@ -1775,6 +1775,8 @@ where
     }
 
     async fn should_create_game_with_range_optimizer(&self) -> Result<(bool, U256, u32)> {
+        tracing::debug!("Checking if should create game with range optimizer");
+
         // Get canonical head and parent game index
         let (canonical_head_l2_block, parent_game_index) = {
             let state = self.state.read().await;
@@ -1789,6 +1791,12 @@ where
 
             (canonical_head_l2_block, parent_game_index)
         };
+
+        tracing::debug!(
+            "Canonical head L2 block: {}, parent game index: {}",
+            canonical_head_l2_block,
+            parent_game_index
+        );
 
         // Use range optimizer to find the optimal L2 block number for the proposal
         let rollup_config = Arc::new(
@@ -1819,6 +1827,11 @@ where
         let eigenda_preimage_provider =
             OnlineEigenDAPreimageProvider::new_http(eigenda_proxy_address.parse()?);
 
+        tracing::debug!(
+            "Calling range optimizer with canonical_head_l2_block: {}",
+            canonical_head_l2_block
+        );
+
         // Call range optimizer
         let target_block = get_target_l2_block_number(
             rollup_config,
@@ -1833,11 +1846,15 @@ where
 
         let next_l2_block_number_for_proposal = U256::from(target_block);
 
+        tracing::debug!("Range optimizer returned target block: {}", target_block);
+
         // Check if the finalized L2 head is at or past the target block
         let finalized_l2_head_block_number = self
             .host
             .get_finalized_l2_block_number(&self.fetcher, canonical_head_l2_block.to::<u64>())
             .await?;
+
+        tracing::debug!("Finalized L2 head block number: {:?}", finalized_l2_head_block_number);
 
         let should_create = next_l2_block_number_for_proposal > canonical_head_l2_block &&
             finalized_l2_head_block_number
@@ -1845,6 +1862,12 @@ where
                     U256::from(finalized_block) >= next_l2_block_number_for_proposal
                 })
                 .unwrap_or(false);
+
+        tracing::debug!(
+            "Should create game: {}, next_l2_block_number_for_proposal: {}",
+            should_create,
+            next_l2_block_number_for_proposal
+        );
 
         Ok((should_create, next_l2_block_number_for_proposal, parent_game_index))
     }
