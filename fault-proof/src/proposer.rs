@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     path::Path,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -694,7 +694,7 @@ where
         // 2. Synchronize the status of all cached games.
         let games = {
             let state = self.state.read().await;
-            state.games.values().map(|game| (game.index, game.address)).collect::<Vec<_>>()
+            state.games.values().map(|game| (game.index, game.address)).collect::<BTreeMap<_, _>>()
         };
 
         if !games.is_empty() {
@@ -736,7 +736,17 @@ where
                 match status {
                     GameStatus::IN_PROGRESS => {
                         let game_type = contract.gameType().call().await?;
-                        let parent_resolved =
+                        let parent_resolved = parent_index == u32::MAX ||
+                            actions.iter().any(|a| {
+                                matches!(
+                                    a,
+                                    GameSyncAction::Update {
+                                        index,
+                                        should_attempt_to_resolve: true,
+                                        ..
+                                    } if index == &U256::from(parent_index)
+                                )
+                            }) ||
                             is_parent_resolved(parent_index, self.factory.as_ref()).await?;
                         let is_game_over = match claim_data.status {
                             ProposalStatus::Unchallenged => now_ts >= deadline,
