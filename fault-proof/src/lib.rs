@@ -1,8 +1,10 @@
 pub mod challenger;
 pub mod config;
 pub mod contract;
+pub mod eigenda_provider;
 pub mod prometheus;
 pub mod proposer;
+pub mod range_optimizer;
 
 use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::{address, keccak256, Address, FixedBytes, B256, U256};
