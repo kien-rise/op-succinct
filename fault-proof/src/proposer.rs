@@ -1775,6 +1775,8 @@ where
     }
 
     async fn should_create_game_with_range_optimizer(&self) -> Result<(bool, U256, u32)> {
+        tracing::debug!("Checking if should create game with range optimizer");
+
         // Get canonical head and parent game index
         let (canonical_head_l2_block, parent_game_index) = {
             let state = self.state.read().await;
@@ -1787,8 +1789,30 @@ where
             let parent_game_index =
                 state.canonical_head_index.map(|index| index.to::<u32>()).unwrap_or(u32::MAX);
 
+            tracing::debug!("Canonical state: {}:{}", canonical_head_l2_block, parent_game_index);
             (canonical_head_l2_block, parent_game_index)
         };
+
+        // Fetch the finalized L2 head
+        let finalized_l2_head_block_number = match self
+            .host
+            .get_finalized_l2_block_number(&self.fetcher, canonical_head_l2_block.to::<u64>())
+            .await?
+        {
+            Some(bn) => {
+                tracing::debug!("Finalized L2 head block number: {:?}", bn);
+                U256::from(bn)
+            }
+            None => {
+                tracing::debug!("Finalized head not found; skipping game creation");
+                return Ok((false, U256::ZERO, u32::MAX));
+            }
+        };
+
+        if canonical_head_l2_block >= finalized_l2_head_block_number {
+            tracing::info!("Finalized L2 head hasn't advanced; skipping game creation");
+            return Ok((false, U256::ZERO, u32::MAX));
+        }
 
         // Use range optimizer to find the optimal L2 block number for the proposal
         let rollup_config = Arc::new(
@@ -1820,6 +1844,7 @@ where
             OnlineEigenDAPreimageProvider::new_http(eigenda_proxy_address.parse()?);
 
         // Call range optimizer
+        tracing::debug!("Starting range optimizer from: {}", canonical_head_l2_block);
         let target_block = get_target_l2_block_number(
             rollup_config,
             l1_config,
@@ -1832,19 +1857,13 @@ where
         .await?;
 
         let next_l2_block_number_for_proposal = U256::from(target_block);
-
-        // Check if the finalized L2 head is at or past the target block
-        let finalized_l2_head_block_number = self
-            .host
-            .get_finalized_l2_block_number(&self.fetcher, canonical_head_l2_block.to::<u64>())
-            .await?;
-
-        let should_create = next_l2_block_number_for_proposal > canonical_head_l2_block &&
-            finalized_l2_head_block_number
-                .map(|finalized_block| {
-                    U256::from(finalized_block) >= next_l2_block_number_for_proposal
-                })
-                .unwrap_or(false);
+        let should_create = canonical_head_l2_block < next_l2_block_number_for_proposal &&
+            next_l2_block_number_for_proposal <= finalized_l2_head_block_number;
+        tracing::debug!(
+            "Should create game: {}, next_l2_block_number_for_proposal: {}",
+            should_create,
+            next_l2_block_number_for_proposal
+        );
 
         Ok((should_create, next_l2_block_number_for_proposal, parent_game_index))
     }
