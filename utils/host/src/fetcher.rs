@@ -17,7 +17,7 @@ use alloy_sol_types::SolValue;
 use alloy_transport::layers::RetryBackoffLayer;
 use anyhow::{anyhow, bail, Context, Result};
 use futures::{stream, StreamExt};
-use kona_genesis::RollupConfig;
+use kona_genesis::{L1ChainConfig, RollupConfig};
 use kona_host::single::SingleChainHost;
 use kona_protocol::L2BlockInfo;
 use kona_registry::L1_CONFIGS;
@@ -35,6 +35,8 @@ use crate::L2Output;
 /// The OPSuccinctDataFetcher struct is used to fetch the L2 output data and L2 claim data for a
 /// given block number. It is used to generate the boot info for the native host program.
 /// FIXME: Add retries for all requests (3 retries).
+///
+/// Invariant: if l1_config_path is defined, then l1_config must also be defined.
 pub struct OPSuccinctDataFetcher {
     pub rpc_config: RPCConfig,
     pub l1_provider: Arc<RootProvider>,
@@ -42,6 +44,7 @@ pub struct OPSuccinctDataFetcher {
     pub rollup_config: Option<RollupConfig>,
     pub rollup_config_path: Option<PathBuf>,
     pub rollup_config_hash: Option<B256>, // derived from rollup_config
+    pub l1_config: Option<L1ChainConfig>,
     pub l1_config_path: Option<PathBuf>,
 }
 
@@ -161,6 +164,7 @@ impl OPSuccinctDataFetcher {
             rollup_config: None,
             rollup_config_path: None,
             rollup_config_hash: None,
+            l1_config: None,
             l1_config_path: None,
         }
     }
@@ -184,7 +188,7 @@ impl OPSuccinctDataFetcher {
         }
 
         // Fetch and save L1 config based on the rollup config's L1 chain ID
-        let l1_config_path = Self::fetch_and_save_l1_config(&rollup_config).await?;
+        let (l1_config, l1_config_path) = Self::fetch_and_save_l1_config(&rollup_config).await?;
 
         Ok(OPSuccinctDataFetcher {
             rpc_config,
@@ -193,6 +197,7 @@ impl OPSuccinctDataFetcher {
             rollup_config_hash: Some(hash_rollup_config(&rollup_config)),
             rollup_config: Some(rollup_config),
             rollup_config_path: Some(rollup_config_path),
+            l1_config: Some(l1_config),
             l1_config_path: Some(l1_config_path),
         })
     }
@@ -371,11 +376,12 @@ impl OPSuccinctDataFetcher {
     }
 
     /// Fetch and save the L1 config based on the rollup config's L1 chain ID.
-    async fn fetch_and_save_l1_config(rollup_config: &RollupConfig) -> Result<PathBuf> {
+    /// Returns both the L1 config and the path to the config file.
+    async fn fetch_and_save_l1_config(rollup_config: &RollupConfig) -> Result<(L1ChainConfig, PathBuf)> {
         let default_dir = PathBuf::from("configs/L1");
         let l1_config_dir = env::var("L1_CONFIG_DIR").map(PathBuf::from).unwrap_or(default_dir);
 
-        // Check if the L1 config file exists. If it does, return the path to the file.
+        // Check if the L1 config file exists. If it does, load and return it.
         let l1_config_path = l1_config_dir.join(format!("{}.json", rollup_config.l1_chain_id));
         if l1_config_path.exists() {
             tracing::info!(
@@ -385,14 +391,14 @@ impl OPSuccinctDataFetcher {
             );
 
             let file = fs::File::open(&l1_config_path)?;
-            let l1_config: Value = serde_json::from_reader(file)?;
+            let l1_config: L1ChainConfig = serde_json::from_reader(file)?;
             tracing::debug!(
                 "Loaded L1 config for chain ID {} from file: {:?}",
                 rollup_config.l1_chain_id,
                 l1_config
             );
 
-            return Ok(l1_config_path);
+            return Ok((l1_config, l1_config_path));
         }
 
         // Lookup the L1 config from the registry.
@@ -427,7 +433,7 @@ impl OPSuccinctDataFetcher {
             l1_config_path.display()
         );
 
-        Ok(l1_config_path)
+        Ok((l1_config.clone(), l1_config_path))
     }
 
     async fn fetch_rpc_data<T>(url: &Url, method: &str, params: Vec<Value>) -> Result<T>
