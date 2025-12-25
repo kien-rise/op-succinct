@@ -10,10 +10,13 @@ use std::{
 use alloy_consensus::Header;
 use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::{Address, BlockNumber, Bytes, FixedBytes, TxHash, B256, U256};
-use alloy_provider::{Provider, ProviderBuilder};
+use alloy_provider::{Provider, ProviderBuilder, RootProvider};
 use alloy_sol_types::{SolEvent, SolValue};
 use anyhow::{bail, Context, Result};
 use futures::stream::{self, StreamExt, TryStreamExt};
+use kona_providers_alloy::{
+    AlloyChainProvider, AlloyL2ChainProvider, OnlineBeaconClient, OnlineBlobProvider,
+};
 use lru::LruCache;
 use op_succinct_client_utils::boot::BootInfoStruct;
 use op_succinct_elfs::AGGREGATION_ELF;
@@ -43,8 +46,10 @@ use crate::{
         DisputeGameFactory::{DisputeGameCreated, DisputeGameFactoryInstance},
         GameStatus, OPSuccinctFaultDisputeGame, ProposalStatus,
     },
+    eigenda_provider::OnlineEigenDAPreimageProvider,
     is_parent_resolved,
     prometheus::ProposerGauge,
+    range_optimizer::get_target_l2_block_number,
     FactoryTrait, L1Provider, L2Provider, L2ProviderTrait,
 };
 
@@ -1759,6 +1764,80 @@ where
         }
     }
 
+    async fn should_create_game_with_range_optimizer(&self) -> Result<(bool, U256, u32)> {
+        // Get canonical head and parent game index
+        let (canonical_head_l2_block, parent_game_index) = {
+            let state = self.state.read().await;
+
+            let Some(canonical_head_l2_block) = state.canonical_head_l2_block else {
+                tracing::info!("No canonical head; skipping game creation");
+                return Ok((false, U256::ZERO, u32::MAX));
+            };
+
+            let parent_game_index =
+                state.canonical_head_index.map(|index| index.to::<u32>()).unwrap_or(u32::MAX);
+
+            (canonical_head_l2_block, parent_game_index)
+        };
+
+        // Use range optimizer to find the optimal L2 block number for the proposal
+        let rollup_config = Arc::new(
+            self.fetcher.rollup_config.clone().context("Rollup config must be initialized")?,
+        );
+        let l1_config =
+            Arc::new(self.fetcher.l1_config.clone().context("L1 config must be initialized")?);
+
+        // Create providers
+        let l1_chain_provider =
+            AlloyChainProvider::new_http(self.fetcher.rpc_config.l1_rpc.clone(), 100);
+
+        let beacon_client = OnlineBeaconClient::new_http(
+            self.fetcher.rpc_config.l1_beacon_rpc.clone().context("L1 beacon RPC must be set")?,
+        );
+        let blob_provider = OnlineBlobProvider::init(beacon_client).await;
+
+        let l2_chain_provider = AlloyL2ChainProvider::new(
+            RootProvider::new(self.fetcher.rpc_config.l2_rpc_client()),
+            rollup_config.clone(),
+            100,
+        );
+
+        // Create EigenDA preimage provider
+        let eigenda_proxy_address =
+            std::env::var("EIGENDA_PROXY_ADDRESS").context("EIGENDA_PROXY_ADDRESS must be set")?;
+        let eigenda_preimage_provider =
+            OnlineEigenDAPreimageProvider::new_http(eigenda_proxy_address.parse()?);
+
+        // Call range optimizer
+        let target_block = get_target_l2_block_number(
+            rollup_config,
+            l1_config,
+            eigenda_preimage_provider,
+            blob_provider,
+            l1_chain_provider,
+            l2_chain_provider,
+            canonical_head_l2_block.to::<u64>(),
+        )
+        .await?;
+
+        let next_l2_block_number_for_proposal = U256::from(target_block);
+
+        // Check if the finalized L2 head is at or past the target block
+        let finalized_l2_head_block_number = self
+            .host
+            .get_finalized_l2_block_number(&self.fetcher, canonical_head_l2_block.to::<u64>())
+            .await?;
+
+        let should_create = next_l2_block_number_for_proposal > canonical_head_l2_block &&
+            finalized_l2_head_block_number
+                .map(|finalized_block| {
+                    U256::from(finalized_block) >= next_l2_block_number_for_proposal
+                })
+                .unwrap_or(false);
+
+        Ok((should_create, next_l2_block_number_for_proposal, parent_game_index))
+    }
+
     /// Spawn a game creation task if conditions are met
     ///
     /// Returns:
@@ -1767,8 +1846,17 @@ where
     /// - Err: Actual error occurred during task spawning
     async fn spawn_game_creation_task(&self) -> Result<bool> {
         // First check if we should create a game
+        let use_range_optimizer = std::env::var("USE_RANGE_OPTIMIZER")
+            .map(|v| v.to_lowercase() == "true")
+            .unwrap_or(false);
+
         let (should_create, next_l2_block_number_for_proposal, parent_game_index) =
-            self.should_create_game().await?;
+            if use_range_optimizer {
+                self.should_create_game_with_range_optimizer().await?
+            } else {
+                self.should_create_game().await?
+            };
+
         if !should_create {
             return Ok(false);
         }
