@@ -45,13 +45,13 @@ where
         signer: SignerLock,
     ) -> Result<Self> {
         let challenger_bond = factory.fetch_challenger_bond(config.game_type).await?;
-        let l2_rpc = config.l2_rpc.clone();
+        let l2_rpc_client = config.l2_rpc_client.clone();
 
         Ok(OPSuccinctChallenger {
             config,
             signer,
             l1_provider: l1_provider.clone(),
-            l2_provider: ProviderBuilder::default().connect_http(l2_rpc),
+            l2_provider: ProviderBuilder::default().connect_client(l2_rpc_client),
             factory,
             challenger_bond,
             state: Arc::new(Mutex::new(ChallengerState {

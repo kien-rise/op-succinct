@@ -60,6 +60,7 @@ pub struct RPCConfig {
     pub l1_requests_per_second: Option<f64>,
     pub l1_beacon_rpc: Option<Url>,
     pub l2_rpc: Url,
+    pub l2_requests_per_second: Option<f64>,
     // TODO(fakedev9999): Make optional if possible.
     pub l2_node_rpc: Url,
 }
@@ -83,7 +84,7 @@ impl RPCConfig {
     }
 
     pub fn l2_rpc_client(&self) -> RpcClient {
-        ClientBuilder::default().http(self.l2_rpc.clone())
+        get_rpc_client(self.l2_rpc.clone(), self.l2_requests_per_second)
     }
 }
 
@@ -102,6 +103,7 @@ pub enum RPCMode {
 /// L1_REQUESTS_PER_SECOND: The maximum number of L1 RPC requests per second.
 /// L1_BEACON_RPC: The L1 beacon RPC URL.
 /// L2_RPC: The L2 RPC URL.
+/// L2_REQUESTS_PER_SECOND: The maximum number of L2 RPC requests per second.
 /// L2_NODE_RPC: The L2 node RPC URL.
 pub fn get_rpcs_from_env() -> RPCConfig {
     let l1_rpc = env::var("L1_RPC").expect("L1_RPC must be set");
@@ -117,6 +119,8 @@ pub fn get_rpcs_from_env() -> RPCConfig {
         .map(|s| Url::parse(s).expect("L1_BEACON_RPC must be a valid URL"));
 
     let l2_rpc = env::var("L2_RPC").expect("L2_RPC must be set");
+    let l2_requests_per_second: Option<f64> =
+        env::var("L2_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
     let l2_node_rpc = env::var("L2_NODE_RPC").expect("L2_NODE_RPC must be set");
 
     RPCConfig {
@@ -124,6 +128,7 @@ pub fn get_rpcs_from_env() -> RPCConfig {
         l1_requests_per_second,
         l1_beacon_rpc,
         l2_rpc: Url::parse(&l2_rpc).expect("L2_RPC must be a valid URL"),
+        l2_requests_per_second,
         l2_node_rpc: Url::parse(&l2_node_rpc).expect("L2_NODE_RPC must be a valid URL"),
     }
 }
@@ -788,7 +793,7 @@ impl OPSuccinctDataFetcher {
             l2_chain_id: Some(l2_chain_id),
             // Trim the trailing slash to avoid double slashes in the URL.
             l2_node_address: Some(
-                self.rpc_config.l2_rpc.as_str().trim_end_matches('/').to_string(),
+                self.rpc_config.l2_rpc.as_str().trim_end_matches('/').to_string(), /* TODO: replace by l2_rpc_client */
             ),
             l1_node_address: None,
             l1_rpc_client: Some(self.rpc_config.l1_rpc_client()),

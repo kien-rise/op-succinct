@@ -17,8 +17,8 @@ pub struct ProposerConfig {
     /// The L1 RPC URL.
     pub l1_rpc_client: RpcClient,
 
-    /// The L2 RPC URL.
-    pub l2_rpc: Url,
+    /// The L2 RPC client.
+    pub l2_rpc_client: RpcClient,
 
     /// The address of the factory contract.
     pub factory_address: Address,
@@ -135,9 +135,12 @@ impl ProposerConfig {
         let l1_rpc_url: Url = env::var("L1_RPC")?.parse().expect("L1_RPC not set");
         let l1_requests_per_second: Option<f64> =
             env::var("L1_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
+        let l2_rpc_url: Url = env::var("L2_RPC")?.parse().expect("L2_RPC not set");
+        let l2_requests_per_second: Option<f64> =
+            env::var("L2_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
         Ok(Self {
             l1_rpc_client: get_rpc_client(l1_rpc_url, l1_requests_per_second),
-            l2_rpc: env::var("L2_RPC")?.parse().expect("L2_RPC not set"),
+            l2_rpc_client: get_rpc_client(l2_rpc_url, l2_requests_per_second),
             factory_address: env::var("FACTORY_ADDRESS")?.parse().expect("FACTORY_ADDRESS not set"),
             mock_mode: env::var("MOCK_MODE").unwrap_or("false".to_string()).parse()?,
             fast_finality_mode: env::var("FAST_FINALITY_MODE")
@@ -213,7 +216,7 @@ impl ProposerConfig {
     pub fn log(&self) {
         tracing::info!(
             l1_rpc = ?self.l1_rpc_client,
-            l2_rpc = %self.l2_rpc,
+            l2_rpc = ?self.l2_rpc_client,
             factory_address = %self.factory_address,
             mock_mode = self.mock_mode,
             fast_finality_mode = self.fast_finality_mode,
@@ -248,7 +251,7 @@ impl ProposerConfig {
 #[derive(Debug, Clone)]
 pub struct ChallengerConfig {
     pub l1_rpc_client: RpcClient,
-    pub l2_rpc: Url,
+    pub l2_rpc_client: RpcClient,
     pub factory_address: Address,
 
     /// The interval in seconds between checking for new challenges opportunities.
@@ -271,10 +274,13 @@ impl ChallengerConfig {
         let l1_requests_per_second: Option<f64> =
             env::var("L1_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
         let l1_rpc_url: Url = env::var("L1_RPC")?.parse().expect("L1_RPC not set");
+        let l2_rpc_url: Url = env::var("L2_RPC")?.parse().expect("L2_RPC not set");
+        let l2_requests_per_second: Option<f64> =
+            env::var("L2_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
 
         Ok(Self {
             l1_rpc_client: get_rpc_client(l1_rpc_url, l1_requests_per_second),
-            l2_rpc: env::var("L2_RPC")?.parse().expect("L2_RPC not set"),
+            l2_rpc_client: get_rpc_client(l2_rpc_url, l2_requests_per_second),
             factory_address: env::var("FACTORY_ADDRESS")?.parse().expect("FACTORY_ADDRESS not set"),
             game_type: env::var("GAME_TYPE").expect("GAME_TYPE not set").parse()?,
             fetch_interval: env::var("FETCH_INTERVAL").unwrap_or("30".to_string()).parse()?,
@@ -291,7 +297,7 @@ impl ChallengerConfig {
     pub fn log(&self) {
         tracing::info!(
             l1_rpc = ?self.l1_rpc_client,
-            l2_rpc = %self.l2_rpc,
+            l2_rpc = ?self.l2_rpc_client,
             factory_address = %self.factory_address,
             game_type = self.game_type,
             fetch_interval = self.fetch_interval,

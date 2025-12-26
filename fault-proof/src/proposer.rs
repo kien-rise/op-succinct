@@ -249,7 +249,7 @@ where
         let (agg_pk, agg_vk) = network_prover.setup(AGGREGATION_ELF);
 
         let l1_provider = ProviderBuilder::default().connect_client(config.l1_rpc_client.clone());
-        let l2_provider = ProviderBuilder::default().connect_http(config.l2_rpc.clone());
+        let l2_provider = ProviderBuilder::default().connect_client(config.l2_rpc_client.clone());
         let init_bond = factory.fetch_init_bond(config.game_type).await?;
 
         // Initialize state with anchor L2 block number
@@ -303,9 +303,9 @@ where
             .await?
             .ok_or_else(|| {
                 anyhow::anyhow!(
-                    "Cannot fetch finalized L2 block number from L2 RPC: {}\n\
+                    "Cannot fetch finalized L2 block number from L2 RPC: {:?}\n\
                      Please check that your L2 node is running and accessible.",
-                    config.l2_rpc
+                    config.l2_rpc_client
                 )
             })?;
 
