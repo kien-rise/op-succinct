@@ -44,7 +44,9 @@ use crate::{
     contract::{
         AnchorStateRegistry,
         DisputeGameFactory::{DisputeGameCreated, DisputeGameFactoryInstance},
-        GameStatus, OPSuccinctFaultDisputeGame, ProposalStatus,
+        GameStatus,
+        OPSuccinctFaultDisputeGame::{self, OPSuccinctFaultDisputeGameInstance},
+        ProposalStatus,
     },
     eigenda_provider::OnlineEigenDAPreimageProvider,
     is_parent_resolved,
@@ -101,6 +103,26 @@ struct SP1Prover {
     agg_pk: Arc<SP1ProvingKey>,
     agg_vk: Arc<SP1VerifyingKey>,
     agg_mode: SP1ProofMode,
+}
+
+/// Checks if a game is provable by this instance of proposer
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct GameHashes {
+    rollup_config_hash: B256,
+    aggregation_vkey: B256,
+    range_vkey_commitment: B256,
+}
+
+impl GameHashes {
+    async fn from_contract(
+        contract: &OPSuccinctFaultDisputeGameInstance<impl Provider + Clone>,
+    ) -> Result<Self> {
+        Ok(Self {
+            rollup_config_hash: contract.rollupConfigHash().call().await?,
+            aggregation_vkey: contract.aggregationVkey().call().await?,
+            range_vkey_commitment: contract.rangeVkeyCommitment().call().await?,
+        })
+    }
 }
 
 /// Represents a dispute game in the on-chain game DAG.
@@ -1312,6 +1334,14 @@ where
         Ok(())
     }
 
+    fn proposer_game_hashes(&self) -> GameHashes {
+        GameHashes {
+            rollup_config_hash: self.fetcher.rollup_config_hash.unwrap_or_default(),
+            aggregation_vkey: B256::from(self.prover.agg_vk.bytes32_raw()),
+            range_vkey_commitment: B256::from(self.prover.range_vk.hash_bytes()),
+        }
+    }
+
     /// Fetch game from the factory.
     ///
     /// Drop game if:
@@ -1393,62 +1423,26 @@ where
             return Ok(GameFetchResult::InvalidGame { index });
         }
 
-        let does_rollup_config_match = {
-            let expected = self.fetcher.rollup_config_hash.unwrap_or_default();
-            let observed = contract.rollupConfigHash().call().await?;
-            if observed == expected {
-                true
-            } else {
-                tracing::warn!(
-                    game_index = %index,
-                    ?game_address,
-                    ?expected,
-                    ?observed,
-                    "Game cannot be proven: rollup config hash mismatch"
-                );
-                false
-            }
-        };
-
-        let does_aggregation_vkey_match = {
-            let expected = B256::from(self.prover.agg_vk.bytes32_raw());
-            let observed = contract.aggregationVkey().call().await?;
-            if observed == expected {
-                true
-            } else {
-                tracing::warn!(
-                    game_index = %index,
-                    ?game_address,
-                    ?expected,
-                    ?observed,
-                    "Game cannot be proven: aggregation vkey mismatch"
-                );
-                false
-            }
-        };
-
-        let does_range_vkey_match = {
-            let expected = B256::from(self.prover.range_vk.hash_bytes());
-            let observed = contract.rangeVkeyCommitment().call().await?;
-            if observed == expected {
-                true
-            } else {
-                tracing::warn!(
-                    game_index = %index,
-                    ?game_address,
-                    ?expected,
-                    ?observed,
-                    "Game cannot be proven: range vkey commitment mismatch"
-                );
-                false
-            }
-        };
-
-        // Note: is_provable = false does not mean the game is invalid.
+        // Note: `is_provable = false` does NOT imply the game is invalid.
+        // It only means this proposer's ELF files do not match.
         // Another proposer with matching ELF files may still be able to prove it.
-        // This situation can occur during Fault Proof contract upgrades.
-        let is_provable =
-            does_rollup_config_match && does_aggregation_vkey_match && does_range_vkey_match;
+        // This commonly occurs during Fault Proof contract upgrades.
+        let is_provable = {
+            let expected = self.proposer_game_hashes();
+            let observed = GameHashes::from_contract(&contract).await?;
+            if observed == expected {
+                true
+            } else {
+                tracing::warn!(
+                    game_index = %index,
+                    ?game_address,
+                    ?expected,
+                    ?observed,
+                    "Game is not provable by this proposer (hashes mismatch)"
+                );
+                false
+            }
+        };
 
         tracing::info!(
             game_index = %index,
@@ -1868,6 +1862,29 @@ where
         Ok((should_create, next_l2_block_number_for_proposal, parent_game_index))
     }
 
+    async fn check_game_impl_hashes(&self) -> Result<()> {
+        let game_impl = self.factory.gameImpls(self.config.game_type).call().await?;
+        if game_impl.is_zero() {
+            return Err(anyhow::anyhow!(
+                "Game creation skipped: no implementation set for game type {}",
+                self.config.game_type
+            ));
+        }
+        let contract = OPSuccinctFaultDisputeGame::new(game_impl, self.l1_provider.clone());
+        let observed = GameHashes::from_contract(&contract).await?;
+        let expected = self.proposer_game_hashes();
+
+        if observed != expected {
+            return Err(anyhow::anyhow!(
+                "Game creation skipped: hashes mismatch: expected={:?} observed={:?}",
+                expected,
+                observed
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Spawn a game creation task if conditions are met
     ///
     /// Returns:
@@ -1875,6 +1892,10 @@ where
     /// - Ok(false): No work needed (proposal interval not elapsed or no finalized blocks)
     /// - Err: Actual error occurred during task spawning
     async fn spawn_game_creation_task(&self) -> Result<bool> {
+        self.check_game_impl_hashes()
+            .await
+            .context("Pre-flight game implementation hash check failed")?;
+
         // First check if we should create a game
         let use_range_optimizer = std::env::var("USE_RANGE_OPTIMIZER")
             .map(|v| v.to_lowercase() == "true")
