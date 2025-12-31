@@ -10,12 +10,14 @@ use std::{
 
 use tempfile::NamedTempFile;
 
+use alloy_consensus::Header;
 use alloy_eips::BlockNumberOrTag;
-use alloy_primitives::{Address, FixedBytes, TxHash, B256, U256};
+use alloy_primitives::{Address, Bytes, FixedBytes, TxHash, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_sol_types::{SolEvent, SolValue};
 use anyhow::{bail, Context, Result};
 use futures::stream::{self, StreamExt, TryStreamExt};
+use lru::LruCache;
 use op_succinct_client_utils::boot::BootInfoStruct;
 use op_succinct_elfs::AGGREGATION_ELF;
 use op_succinct_host_utils::{
@@ -28,7 +30,7 @@ use op_succinct_host_utils::{
 };
 use op_succinct_proof_utils::get_range_elf_embedded;
 use op_succinct_signer_utils::SignerLock;
-use sp1_sdk::{HashableKey, Prover, ProverClient, SP1ProofWithPublicValues, SP1Stdin};
+use sp1_sdk::{HashableKey, Prover, ProverClient, SP1Proof, SP1ProofWithPublicValues, SP1Stdin};
 use tokio::{
     sync::{Mutex, RwLock, Semaphore},
     time,
@@ -203,6 +205,24 @@ pub struct ContractParams {
     pub max_prove_duration: u64,
 }
 
+struct ProofCache {
+    range_proof_stdin: LruCache<Bytes, SP1Stdin>,
+    range_proof_request: LruCache<Bytes, SP1ProofWithPublicValues>,
+    agg_proof_stdin: LruCache<Bytes, SP1Stdin>,
+    agg_proof_request: LruCache<Bytes, SP1ProofWithPublicValues>,
+}
+
+impl ProofCache {
+    fn with_capacity(range_cap: usize, agg_cap: usize) -> Self {
+        Self {
+            range_proof_stdin: LruCache::new(range_cap.try_into().unwrap()),
+            range_proof_request: LruCache::new(range_cap.try_into().unwrap()),
+            agg_proof_stdin: LruCache::new(agg_cap.try_into().unwrap()),
+            agg_proof_request: LruCache::new(agg_cap.try_into().unwrap()),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct OPSuccinctProposer<P, H: OPSuccinctHost>
 where
@@ -225,6 +245,7 @@ where
     next_task_id: Arc<AtomicU64>,
     state: Arc<RwLock<ProposerState>>,
     backup_semaphore: Arc<Semaphore>,
+    proof_cache: Arc<Mutex<ProofCache>>,
 }
 
 impl<P, H> OPSuccinctProposer<P, H>
@@ -299,6 +320,11 @@ where
             next_task_id: Arc::new(AtomicU64::new(1)),
             state: Arc::new(RwLock::new(initial_state)),
             backup_semaphore: Arc::new(Semaphore::new(1)),
+            proof_cache: Arc::new(Mutex::new(ProofCache::with_capacity(
+                (config.fast_finality_proving_limit + 2) as usize *
+                    config.range_split_count.to_usize(),
+                (config.fast_finality_proving_limit + 2) as usize,
+            ))),
         })
     }
 
@@ -962,9 +988,9 @@ where
             let this = self.clone();
             async move {
                 tracing::info!("Generating Range Proof for blocks {start} to {end}");
-                let sp1_stdin = this.range_proof_stdin(start, end).await?;
+                let sp1_stdin = this.range_proof_stdin_with_cache(start, end).await?;
                 let (range_proof, inst_cycles, sp1_gas) =
-                    this.prover.generate_range_proof(&sp1_stdin).await?;
+                    this.range_proof_request_with_cache(&sp1_stdin).await?;
                 Ok::<_, anyhow::Error>((idx, range_proof, inst_cycles, sp1_gas))
             }
         });
@@ -1019,14 +1045,17 @@ where
         };
 
         tracing::info!("Preparing Stdin for Agg Proof");
-        let sp1_stdin = match get_agg_proof_stdin(
-            proofs,
-            boot_infos,
-            headers,
-            &self.prover.keys().range_vk,
-            l1_head_hash,
-            self.signer.address(),
-        ) {
+        let sp1_stdin = match self
+            .agg_proof_stdin_with_cache(
+                proofs,
+                boot_infos,
+                headers,
+                &self.prover.keys().range_vk,
+                l1_head_hash,
+                self.signer.address(),
+            )
+            .await
+        {
             Ok(s) => s,
             Err(e) => {
                 tracing::error!("Failed to get agg proof stdin: {e}");
@@ -1034,7 +1063,7 @@ where
             }
         };
 
-        let agg_proof = self.prover.generate_agg_proof(&sp1_stdin).await?;
+        let agg_proof = self.agg_proof_request_with_cache(&sp1_stdin).await?;
 
         let transaction_request = game.prove(agg_proof.bytes().into()).into_transaction_request();
         let receipt = self
@@ -1073,6 +1102,89 @@ where
         };
 
         Ok(sp1_stdin)
+    }
+
+    async fn range_proof_stdin_with_cache(
+        &self,
+        start_block: u64,
+        end_block: u64,
+    ) -> Result<SP1Stdin> {
+        let key: Bytes = serde_cbor::to_vec(&(start_block, end_block))?.into();
+        if let Some(result) = self.proof_cache.lock().await.range_proof_stdin.get(&key) {
+            tracing::debug!("Cache hit for range_proof_stdin");
+            return Ok(result.clone());
+        }
+        tracing::debug!("Cache miss for range_proof_stdin, generating stdin...");
+        let result = self.range_proof_stdin(start_block, end_block).await?;
+        self.proof_cache.lock().await.range_proof_stdin.push(key, result.clone());
+        Ok(result)
+    }
+
+    async fn range_proof_request_with_cache(
+        &self,
+        sp1_stdin: &SP1Stdin,
+    ) -> Result<(SP1ProofWithPublicValues, u64, u64)> {
+        let key: Bytes = serde_cbor::to_vec(&sp1_stdin)?.into();
+        if let Some(result) = self.proof_cache.lock().await.range_proof_request.get(&key) {
+            tracing::debug!("Cache hit for range_proof_request");
+            return Ok((result.clone(), 0, 0));
+        }
+        tracing::debug!("Cache miss for range_proof_request, generating proof...");
+        let (result, _, _) = self.prover.generate_range_proof(sp1_stdin).await?;
+        self.proof_cache.lock().await.range_proof_request.push(key, result.clone());
+        Ok((result, 0, 0))
+    }
+
+    pub async fn agg_proof_stdin_with_cache(
+        &self,
+        proofs: Vec<SP1Proof>,
+        boot_infos: Vec<BootInfoStruct>,
+        headers: Vec<Header>,
+        multi_block_vkey: &sp1_sdk::SP1VerifyingKey,
+        latest_checkpoint_head: B256,
+        prover_address: Address,
+    ) -> Result<SP1Stdin> {
+        let key: Bytes = serde_cbor::to_vec(&(
+            &proofs,
+            &boot_infos,
+            &headers,
+            &multi_block_vkey,
+            &latest_checkpoint_head,
+            &prover_address,
+        ))?
+        .into();
+
+        if let Some(result) = self.proof_cache.lock().await.agg_proof_stdin.get(&key) {
+            tracing::debug!("Cache hit for agg_proof_stdin");
+            return Ok(result.clone());
+        }
+
+        tracing::debug!("Cache miss for agg_proof_stdin, generating stdin...");
+        let result = get_agg_proof_stdin(
+            proofs,
+            boot_infos,
+            headers,
+            multi_block_vkey,
+            latest_checkpoint_head,
+            prover_address,
+        )?;
+        self.proof_cache.lock().await.agg_proof_stdin.push(key, result.clone());
+        Ok(result)
+    }
+
+    async fn agg_proof_request_with_cache(
+        &self,
+        sp1_stdin: &SP1Stdin,
+    ) -> Result<SP1ProofWithPublicValues> {
+        let key: Bytes = serde_cbor::to_vec(&sp1_stdin)?.into();
+        if let Some(result) = self.proof_cache.lock().await.agg_proof_request.get(&key) {
+            tracing::debug!("Cache hit for agg_proof_request");
+            return Ok(result.clone());
+        }
+        tracing::debug!("Cache miss for agg_proof_request, generating proof...");
+        let result = self.prover.generate_agg_proof(sp1_stdin).await?;
+        self.proof_cache.lock().await.agg_proof_request.push(key, result.clone());
+        Ok(result)
     }
 
     /// Creates a new game with the given parameters.

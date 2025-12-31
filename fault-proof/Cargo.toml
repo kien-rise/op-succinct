@@ -32,6 +32,7 @@ op-succinct-signer-utils.workspace = true
 sp1-sdk.workspace = true
 
 # alloy
+alloy-consensus.workspace = true
 alloy-contract.workspace = true
 alloy-eips.workspace = true
 alloy-network.workspace = true
@@ -56,8 +57,10 @@ async-trait.workspace = true
 clap = { workspace = true, features = ["derive"] }
 dotenv.workspace = true
 futures.workspace = true
+lru.workspace = true
 rand = "0.9"
 serde.workspace = true
+serde_cbor.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
