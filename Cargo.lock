@@ -8653,12 +8653,7 @@ dependencies = [
  "hokulea-eigenda",
  "hokulea-host-bin",
  "kona-derive",
- "kona-driver",
- "kona-executor",
  "kona-genesis",
- "kona-host",
- "kona-preimage",
- "kona-proof",
  "kona-protocol",
  "kona-providers-alloy",
  "kona-registry",
@@ -8825,6 +8820,7 @@ dependencies = [
  "dotenv",
  "futures",
  "kona-genesis",
+ "kona-providers-alloy",
  "log",
  "op-succinct-build-utils",
  "op-succinct-client-utils",
@@ -8838,6 +8834,7 @@ dependencies = [
  "sp1-sdk",
  "tokio",
  "tracing",
+ "tracing-subscriber 0.3.20",
 ]
 
 [[package]]
