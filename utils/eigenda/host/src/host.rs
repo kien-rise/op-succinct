@@ -80,6 +80,14 @@ impl OPSuccinctHost for EigenDAOPSuccinctHost {
 
 impl EigenDAOPSuccinctHost {
     pub fn new(fetcher: Arc<OPSuccinctDataFetcher>) -> Self {
-        Self { fetcher, witness_generator: Arc::new(EigenDAWitnessGenerator {}) }
+        let l1_rpc_client = fetcher.rpc_config.l1_rpc_client();
+        let mock_mode = std::env::var("OP_SUCCINCT_MOCK")
+            .unwrap_or("false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
+        Self {
+            fetcher,
+            witness_generator: Arc::new(EigenDAWitnessGenerator::new(l1_rpc_client, mock_mode)),
+        }
     }
 }
