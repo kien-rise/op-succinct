@@ -3,7 +3,21 @@ use op_succinct_client_utils::witness::{
     preimage_store::PreimageStore, BlobData, EigenDAWitnessData,
 };
 use op_succinct_eigenda_host_utils::witness_generator::EigenDAWitnessGenerator;
-use op_succinct_host_utils::witness_generation::WitnessGenerator;
+use op_succinct_host_utils::{fetcher::get_rpc_client, witness_generation::WitnessGenerator};
+
+fn witness_generator() -> anyhow::Result<EigenDAWitnessGenerator> {
+    let l1_rpc_url = std::env::var("L1_RPC")
+        .map_err(|_| anyhow::anyhow!("L1_RPC environment variable not set"))?;
+    let l1_requests_per_second: Option<f64> =
+        std::env::var("L1_REQUESTS_PER_SECOND").ok().and_then(|v| v.parse().ok());
+    let l1_rpc_client = get_rpc_client(l1_rpc_url.parse()?, l1_requests_per_second);
+
+    let mock_mode = std::env::var("OP_SUCCINCT_MOCK")
+        .unwrap_or("false".to_string())
+        .parse::<bool>()
+        .unwrap_or(false);
+    Ok(EigenDAWitnessGenerator::new(l1_rpc_client, mock_mode))
+}
 
 fn default_witness() -> EigenDAWitnessData {
     EigenDAWitnessData {
@@ -15,13 +29,13 @@ fn default_witness() -> EigenDAWitnessData {
 
 #[test]
 fn test_get_sp1_stdin_with_no_eigenda_data() {
-    let generator = EigenDAWitnessGenerator {};
+    let generator = witness_generator().unwrap();
     assert!(generator.get_sp1_stdin(default_witness()).is_ok());
 }
 
 #[test]
 fn test_get_sp1_stdin_rejects_malformed_eigenda_data() {
-    let generator = EigenDAWitnessGenerator {};
+    let generator = witness_generator().unwrap();
     let witness = EigenDAWitnessData {
         preimage_store: PreimageStore::default(),
         blob_data: BlobData::default(),
@@ -36,14 +50,10 @@ fn test_get_sp1_stdin_rejects_malformed_eigenda_data() {
 /// This is a realistic scenario for blocks without EigenDA certs requiring validity proofs.
 #[test]
 fn test_get_sp1_stdin_with_eigenda_data_but_no_canoe_proof() {
-    let generator = EigenDAWitnessGenerator {};
+    let generator = witness_generator().unwrap();
 
-    let eigenda_witness = EigenDAWitness {
-        recencies: vec![],
-        validities: vec![],
-        encoded_payloads: vec![],
-        canoe_proof_bytes: None,
-    };
+    let eigenda_witness =
+        EigenDAWitness { validities: vec![], encoded_payloads: vec![], canoe_proof_bytes: None };
 
     let eigenda_data = serde_cbor::to_vec(&eigenda_witness).expect("serialization should work");
 
@@ -60,11 +70,10 @@ fn test_get_sp1_stdin_with_eigenda_data_but_no_canoe_proof() {
 /// This bypasses the first deserialization but should fail at nested proof deserialization.
 #[test]
 fn test_get_sp1_stdin_rejects_invalid_canoe_proof_bytes() {
-    let generator = EigenDAWitnessGenerator {};
+    let generator = witness_generator().unwrap();
 
     // Create a valid EigenDAWitness with garbage in canoe_proof_bytes
     let eigenda_witness = EigenDAWitness {
-        recencies: vec![],
         validities: vec![],
         encoded_payloads: vec![],
         canoe_proof_bytes: Some(vec![0xFF, 0xFF, 0xFF, 0xFF]), // Invalid proof bytes
