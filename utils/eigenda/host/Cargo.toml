@@ -32,6 +32,7 @@ canoe-verifier-address-fetcher.workspace = true
 # alloy
 alloy-eips.workspace = true
 alloy-primitives.workspace = true
+alloy-rpc-client.workspace = true
 
 # general
 anyhow.workspace = true

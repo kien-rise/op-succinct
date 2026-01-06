@@ -8559,6 +8559,7 @@ version = "3.4.1"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
+ "alloy-rpc-client",
  "anyhow",
  "async-trait",
  "canoe-sp1-cc-host",
