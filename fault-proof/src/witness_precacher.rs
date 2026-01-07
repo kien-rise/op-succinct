@@ -72,7 +72,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     /*
-    RUST_LOG=debug cargo test --release \
+    RUST_LOG=trace cargo test --release \
         --package op-succinct-fp --lib --features eigenda --features integration -- \
         witness_precacher::tests::run_generate_witness_slow --exact --nocapture --ignored -- \
         "$L2_START_BLOCK" "$L2_END_BLOCK"
@@ -81,6 +81,7 @@ mod tests {
         tracing_subscriber::fmt()
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .init();
+        println!("{:?}", std::env::current_dir());
         #[derive(Parser, Debug)]
         struct Args {
             l2_start_block: BlockNumber,

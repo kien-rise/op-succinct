@@ -29,6 +29,10 @@ hokulea-witgen.workspace = true
 canoe-sp1-cc-host.workspace = true
 canoe-verifier-address-fetcher.workspace = true
 
+rust-kzg-bn254-primitives = { version = "0.1.3", git = "https://github.com/Layr-Labs/rust-kzg-bn254.git", default-features = false }
+rust-kzg-bn254-verifier = { version = "0.1.3", git = "https://github.com/Layr-Labs/rust-kzg-bn254.git", default-features = false }
+rust-kzg-bn254-prover = { version = "0.1.2", git = "https://github.com/Layr-Labs/rust-kzg-bn254.git", default-features = false }
+
 # alloy
 alloy-eips.workspace = true
 alloy-primitives.workspace = true

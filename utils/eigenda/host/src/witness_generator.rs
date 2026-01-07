@@ -1,10 +1,11 @@
 use std::sync::{Arc, Mutex};
 
+use alloy_primitives::FixedBytes;
 use alloy_rpc_client::RpcClient;
 use anyhow::Result;
 use async_trait::async_trait;
 use canoe_verifier_address_fetcher::CanoeVerifierAddressFetcherDeployedByEigenLabs;
-use hokulea_compute_proof::create_kzg_proofs_for_eigenda_preimage;
+use hokulea_compute_proof::compute_kzg_proof_with_srs;
 use hokulea_proof::{
     eigenda_provider::OracleEigenDAPreimageProvider,
     eigenda_witness::{EigenDAPreimage, EigenDAWitness},
@@ -23,6 +24,7 @@ use op_succinct_host_utils::witness_generation::{
     DefaultOracleBase, WitnessGenerator,
 };
 use rkyv::to_bytes;
+use rust_kzg_bn254_prover::srs::SRS;
 use sp1_core_executor::SP1ReduceProof;
 use sp1_prover::InnerSC;
 use sp1_sdk::{ProverClient, SP1Stdin};
@@ -36,11 +38,18 @@ type WitnessExecutor = EigenDAWitnessExecutor<
 pub struct EigenDAWitnessGenerator {
     l1_rpc_client: RpcClient,
     mock_mode: bool,
+    srs: SRS<'static>,
 }
 
 impl EigenDAWitnessGenerator {
     pub fn new(l1_rpc_client: RpcClient, mock_mode: bool) -> Self {
-        Self { l1_rpc_client, mock_mode }
+        let srs = SRS::new(
+            std::env::var("SRS_FILE").as_deref().unwrap_or("resources/g1.point"),
+            268435456,
+            524288,
+        )
+        .expect("missing srs file");
+        Self { l1_rpc_client, mock_mode, srs }
     }
 }
 
@@ -143,7 +152,13 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         // Extract the EigenDA preimage data
         let eigenda_preimage_data = std::mem::take(&mut *eigenda_preimage.lock().unwrap());
 
-        let kzg_proofs = create_kzg_proofs_for_eigenda_preimage(&eigenda_preimage_data);
+        let mut kzg_proofs = vec![];
+        for (_, encoded_payload) in &eigenda_preimage_data.encoded_payloads {
+            let kzg_proof = compute_kzg_proof_with_srs(encoded_payload.serialize(), &self.srs)
+                .expect("cannot generate a kzg proof");
+            let bytes: FixedBytes<64> = FixedBytes::from_slice(kzg_proof.as_ref());
+            kzg_proofs.push(bytes);
+        }
 
         // Generate canoe proofs using the reduced proof provider for proof aggregation
         use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
