@@ -63,7 +63,7 @@ kona-registry.workspace = true
 # general
 anyhow.workspace = true
 async-trait.workspace = true
-clap = { workspace = true, features = ["derive"] }
+clap = { workspace = true, features = ["derive", "env"] }
 dotenv.workspace = true
 futures.workspace = true
 eigenda-cert.workspace = true
@@ -91,6 +91,7 @@ serde.workspace = true
 alloy-rpc-types-trace.workspace = true
 rstest = "0.26"
 which = "4.4"
+tempfile = "3.15"
 
 [features]
 default = ["ethereum"]

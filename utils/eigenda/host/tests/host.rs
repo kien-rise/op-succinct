@@ -3,8 +3,9 @@ mod host {
     use std::sync::Arc;
 
     use alloy_eips::BlockId;
-    use alloy_primitives::B256;
+    use alloy_primitives::{BlockNumber, B256};
     use anyhow::Result;
+    use clap::Parser;
     use op_succinct_eigenda_host_utils::host::EigenDAOPSuccinctHost;
     use op_succinct_host_utils::{fetcher::OPSuccinctDataFetcher, host::OPSuccinctHost};
 
@@ -74,6 +75,36 @@ mod host {
         let finalized_l1 = ctx.host.fetcher.get_l1_header(BlockId::finalized()).await?;
         assert!(safe_l1_header.number <= finalized_l1.number);
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    /// This test must be run manually:
+    /*
+        RUST_LOG=info cargo test \
+            --package op-succinct-eigenda-host-utils \
+            --test host \
+            --features integration -- \
+            host::test_manually_calculate_safe_l1_head --exact --nocapture --ignored -- \
+            "$L2_BLOCK_NUMBER"
+    */
+    async fn test_manually_calculate_safe_l1_head() -> Result<()> {
+        tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .init();
+
+        #[derive(Debug, Parser)]
+        struct Args {
+            l2_block_number: BlockNumber,
+        }
+        let args = Args::try_parse_from(std::env::args_os().skip_while(|arg| arg != "--"))?;
+        tracing::info!(?args, "Starting safe L1 head calculation");
+
+        let ctx = TestContext::new().await?;
+        let safe_l1_head =
+            ctx.host.calculate_safe_l1_head(&ctx.host.fetcher, args.l2_block_number, false).await?;
+        tracing::info!(?safe_l1_head, "Successfully calculated safe L1 head");
         Ok(())
     }
 

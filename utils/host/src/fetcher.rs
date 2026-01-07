@@ -447,6 +447,12 @@ impl OPSuccinctDataFetcher {
     where
         T: serde::de::DeserializeOwned,
     {
+        tracing::trace!(
+            "fetch_rpc_data: Starting RPC call - url={}, method={}, params={:?}",
+            url,
+            method,
+            params
+        );
         let client = reqwest::Client::new();
         let response = client
             .post(url.clone())
@@ -461,13 +467,36 @@ impl OPSuccinctDataFetcher {
             .json::<serde_json::Value>()
             .await?;
 
+        tracing::trace!("fetch_rpc_data: Received response for method={}", method);
+
         // Check for RPC error from the JSON RPC response.
         if let Some(error) = response.get("error") {
             let error_message = error["message"].as_str().unwrap_or("Unknown error");
+            tracing::trace!(
+                "fetch_rpc_data: RPC error for method={} - error={}",
+                method,
+                error_message
+            );
             return Err(anyhow::anyhow!("Error calling {method}: {error_message}"));
         }
 
-        serde_json::from_value(response["result"].clone()).map_err(Into::into)
+        let result = serde_json::from_value(response["result"].clone()).map_err(Into::into);
+        match &result {
+            Ok(_) => {
+                tracing::trace!(
+                    "fetch_rpc_data: Successfully parsed response for method={}",
+                    method
+                );
+            }
+            Err(e) => {
+                tracing::trace!(
+                    "fetch_rpc_data: Failed to parse response for method={} - error={}",
+                    method,
+                    e
+                );
+            }
+        }
+        result
     }
 
     /// Fetch arbitrary data from the RPC.
@@ -579,6 +608,10 @@ impl OPSuccinctDataFetcher {
     ///
     /// Use binary search to find the first L1 block with an L2 safe head >= l2_end_block.
     pub async fn get_safe_l1_block_for_l2_block(&self, l2_end_block: u64) -> Result<(B256, u64)> {
+        tracing::debug!(
+            "get_safe_l1_block_for_l2_block: Starting for l2_end_block={}",
+            l2_end_block
+        );
         let latest_l1_header = self.get_l1_header(BlockId::finalized()).await?;
 
         // Get the l1 origin of the l2 end block.
@@ -592,6 +625,12 @@ impl OPSuccinctDataFetcher {
             .await?;
 
         let l1_origin = optimism_output_data.block_ref.l1_origin;
+
+        tracing::debug!(
+            "get_safe_l1_block_for_l2_block: l1_origin.number={}, latest_l1_header.number={}",
+            l1_origin.number,
+            latest_l1_header.number
+        );
 
         // Binary search for the first L1 block with L2 safe head >= l2_end_block.
         let mut low = l1_origin.number;
@@ -610,9 +649,17 @@ impl OPSuccinctDataFetcher {
                 .await?;
             let l2_safe_head = result.safe_head.number;
 
+            tracing::debug!("get_safe_l1_block_for_l2_block: Binary search iteration - mid={}, l2_safe_head={}, target={}, low={}, high={}",
+                mid, l2_safe_head, l2_end_block, low, high);
+
             if l2_safe_head >= l2_end_block {
                 // Found a valid block, save it and keep searching lower.
                 first_valid = Some((result.l1_block.hash, result.l1_block.number));
+                tracing::debug!(
+                    "get_safe_l1_block_for_l2_block: Found valid block - l1_block={}, l1_hash={}",
+                    result.l1_block.number,
+                    result.l1_block.hash
+                );
                 high = mid - 1;
             } else {
                 // Need to search higher
@@ -620,11 +667,22 @@ impl OPSuccinctDataFetcher {
             }
         }
 
-        first_valid.ok_or_else(|| {
+        let result = first_valid.ok_or_else(|| {
             anyhow::anyhow!(
                 "Could not find an L1 block with an L2 safe head greater than the L2 end block."
             )
-        })
+        });
+
+        match &result {
+            Ok((hash, number)) => {
+                tracing::debug!("get_safe_l1_block_for_l2_block: Completed successfully - l1_block={}, l1_hash={}", number, hash);
+            }
+            Err(e) => {
+                tracing::debug!("get_safe_l1_block_for_l2_block: Failed - error={}", e);
+            }
+        }
+
+        result
     }
 
     /// If the safeDB is activated, use it to fetch the L1 block where the batch including the data

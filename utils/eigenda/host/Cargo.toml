@@ -39,11 +39,13 @@ anyhow.workspace = true
 async-trait.workspace = true
 rkyv.workspace = true
 serde_cbor.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
+clap.workspace = true
 dotenv.workspace = true
 tokio.workspace = true
-tracing.workspace = true
+tracing-subscriber.workspace = true
 
 [features]
 integration = []

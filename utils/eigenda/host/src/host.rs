@@ -64,17 +64,47 @@ impl OPSuccinctHost for EigenDAOPSuccinctHost {
         l2_end_block: u64,
         safe_db_fallback: bool,
     ) -> Result<B256> {
+        tracing::debug!(
+            "calculate_safe_l1_head: Starting for l2_end_block={}, safe_db_fallback={}",
+            l2_end_block,
+            safe_db_fallback
+        );
+
         // For EigenDA, use a similar approach to Ethereum DA with a conservative offset.
         let (_, l1_head_number) = fetcher.get_l1_head(l2_end_block, safe_db_fallback).await?;
 
+        tracing::debug!(
+            "calculate_safe_l1_head: Got l1_head_number={} from fetcher",
+            l1_head_number
+        );
+
         // Add a buffer for EigenDA similar to Ethereum DA.
         let l1_head_number = l1_head_number + 20;
+
+        tracing::debug!(
+            "calculate_safe_l1_head: After adding buffer of 20, l1_head_number={}",
+            l1_head_number
+        );
 
         // Ensure we don't exceed the finalized L1 header.
         let finalized_l1_header = fetcher.get_l1_header(BlockId::finalized()).await?;
         let safe_l1_head_number = std::cmp::min(l1_head_number, finalized_l1_header.number);
 
-        Ok(fetcher.get_l1_header(safe_l1_head_number.into()).await?.hash_slow())
+        tracing::debug!(
+            "calculate_safe_l1_head: finalized_l1_header.number={}, safe_l1_head_number={}",
+            finalized_l1_header.number,
+            safe_l1_head_number
+        );
+
+        let result_header = fetcher.get_l1_header(safe_l1_head_number.into()).await?;
+        let result_hash = result_header.hash_slow();
+
+        tracing::debug!(
+            "calculate_safe_l1_head: Completed successfully - safe_l1_head_hash={}",
+            result_hash
+        );
+
+        Ok(result_hash)
     }
 }
 

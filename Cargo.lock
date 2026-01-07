@@ -8564,6 +8564,7 @@ dependencies = [
  "async-trait",
  "canoe-sp1-cc-host",
  "canoe-verifier-address-fetcher",
+ "clap",
  "dotenv",
  "hokulea-compute-proof",
  "hokulea-eigenda",
@@ -8583,6 +8584,7 @@ dependencies = [
  "sp1-sdk",
  "tokio",
  "tracing",
+ "tracing-subscriber 0.3.20",
 ]
 
 [[package]]
@@ -8676,6 +8678,7 @@ dependencies = [
  "sp1-sdk",
  "strum 0.27.2",
  "strum_macros 0.27.2",
+ "tempfile",
  "tikv-jemallocator",
  "tokio",
  "tracing",
