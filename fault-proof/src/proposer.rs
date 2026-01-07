@@ -928,8 +928,6 @@ where
         tracing::info!("Attempting to prove game {:?}", game_address);
 
         let game = OPSuccinctFaultDisputeGame::new(game_address, self.l1_provider.clone());
-        let l1_head_hash = game.l1Head().call().await?.0;
-        tracing::debug!("L1 head hash: {:?}", hex::encode(l1_head_hash));
 
         let ranges = self
             .config
@@ -944,7 +942,7 @@ where
             async move {
                 tracing::info!("Generating Range Proof for blocks {start} to {end}");
                 let sp1_stdin =
-                    this.range_proof_stdin_with_cache(start, end, l1_head_hash.into()).await?;
+                    this.range_proof_stdin_with_cache(start, end).await?;
                 let (range_proof, inst_cycles, sp1_gas) =
                     this.range_proof_request_with_cache(&sp1_stdin).await?;
                 Ok::<_, anyhow::Error>((idx, range_proof, inst_cycles, sp1_gas))
@@ -1036,11 +1034,10 @@ where
         &self,
         start_block: u64,
         end_block: u64,
-        l1_head_hash: B256,
     ) -> Result<SP1Stdin> {
         let host_args = self
             .host
-            .fetch(start_block, end_block, Some(l1_head_hash), self.config.safe_db_fallback)
+            .fetch(start_block, end_block, None, self.config.safe_db_fallback)
             .await
             .context("Failed to get host CLI args")?;
 
@@ -1067,15 +1064,14 @@ where
         &self,
         start_block: u64,
         end_block: u64,
-        l1_head_hash: B256,
     ) -> Result<SP1Stdin> {
-        let key: Bytes = serde_cbor::to_vec(&(start_block, end_block, l1_head_hash))?.into();
+        let key: Bytes = serde_cbor::to_vec(&(start_block, end_block))?.into();
         if let Some(result) = self.proof_cache.lock().await.range_proof_stdin.get(&key) {
             tracing::debug!("Cache hit for range_proof_stdin");
             return Ok(result.clone());
         }
         tracing::debug!("Cache miss for range_proof_stdin, generating stdin...");
-        let result = self.range_proof_stdin(start_block, end_block, l1_head_hash).await?;
+        let result = self.range_proof_stdin(start_block, end_block).await?;
         self.proof_cache.lock().await.range_proof_stdin.push(key, result.clone());
         Ok(result)
     }
