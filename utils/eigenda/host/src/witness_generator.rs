@@ -103,6 +103,8 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         preimage_chan: NativeChannel,
         hint_chan: NativeChannel,
     ) -> Result<Self::WitnessData> {
+        tracing::debug!("Starting EigenDAWitnessGenerator::run");
+
         let preimage_witness_store = Arc::new(std::sync::Mutex::new(PreimageStore::default()));
         let blob_data = Arc::new(std::sync::Mutex::new(BlobData::default()));
 
@@ -130,8 +132,10 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
 
         let executor = EigenDAWitnessExecutor::new(eigenda_preimage_provider);
 
+        tracing::debug!("Getting inputs for pipeline");
         let (boot_info, input) = get_inputs_for_pipeline(oracle.clone()).await?;
         if let Some((cursor, l1_provider, l2_provider)) = input {
+            tracing::debug!("Creating pipeline");
             let rollup_config = Arc::new(boot_info.rollup_config.clone());
             let l1_config = Arc::new(boot_info.l1_config.clone());
             let pipeline = WitnessExecutorTrait::create_pipeline(
@@ -145,13 +149,20 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
                 l2_provider.clone(),
             )
             .await?;
+            tracing::debug!("Running witness executor");
             WitnessExecutorTrait::run(&executor, boot_info.clone(), pipeline, cursor, l2_provider)
                 .await?;
+            tracing::debug!("Witness executor completed");
         }
 
         // Extract the EigenDA preimage data
+        tracing::debug!("Extracting EigenDA preimage data");
         let eigenda_preimage_data = std::mem::take(&mut *eigenda_preimage.lock().unwrap());
 
+        tracing::debug!(
+            "Generating KZG proofs for {} encoded payloads",
+            eigenda_preimage_data.encoded_payloads.len()
+        );
         let mut kzg_proofs = vec![];
         for (_, encoded_payload) in &eigenda_preimage_data.encoded_payloads {
             let kzg_proof = compute_kzg_proof_with_srs(encoded_payload.serialize(), &self.srs)
@@ -159,8 +170,10 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             let bytes: FixedBytes<64> = FixedBytes::from_slice(kzg_proof.as_ref());
             kzg_proofs.push(bytes);
         }
+        tracing::debug!("Generated {} KZG proofs", kzg_proofs.len());
 
         // Generate canoe proofs using the reduced proof provider for proof aggregation
+        tracing::debug!("Generating canoe proofs (mock_mode: {})", self.mock_mode);
         use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
         let canoe_provider = CanoeSp1CCReducedProofProvider {
             eth_rpc_client: self.l1_rpc_client.clone(),
@@ -174,25 +187,33 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             CanoeVerifierAddressFetcherDeployedByEigenLabs {},
         )
         .await?;
+        tracing::debug!(
+            "Canoe proof generation completed (proof present: {})",
+            maybe_canoe_proof.is_some()
+        );
 
         let maybe_canoe_proof_bytes =
             maybe_canoe_proof.map(|proof| serde_cbor::to_vec(&proof).expect("serde error"));
 
+        tracing::debug!("Creating EigenDA witness from preimage data");
         let eigenda_witness = EigenDAWitness::from_preimage(
             eigenda_preimage_data,
             kzg_proofs,
             maybe_canoe_proof_bytes,
         )?;
 
+        tracing::debug!("Serializing EigenDA witness data");
         let eigenda_witness_bytes =
             serde_cbor::to_vec(&eigenda_witness).expect("Failed to serialize EigenDA witness data");
 
+        tracing::debug!("Creating final witness data");
         let witness = EigenDAWitnessData {
             preimage_store: preimage_witness_store.lock().unwrap().clone(),
             blob_data: blob_data.lock().unwrap().clone(),
             eigenda_data: Some(eigenda_witness_bytes),
         };
 
+        tracing::debug!("EigenDAWitnessGenerator::run completed successfully");
         Ok(witness)
     }
 }

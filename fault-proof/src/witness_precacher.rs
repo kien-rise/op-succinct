@@ -65,6 +65,7 @@ mod tests {
     use alloy_primitives::{address, BlockNumber, B256};
     use anyhow::Result;
     use clap::Parser;
+    use op_succinct_eigenda_host_utils::{host::EigenDAOPSuccinctHost, witness_generator::EigenDAWitnessGenerator};
     use op_succinct_host_utils::{fetcher::OPSuccinctDataFetcher, host::OPSuccinctHost};
     use op_succinct_proof_utils::initialize_host;
     use std::{ffi::OsString, sync::OnceLock};
@@ -92,7 +93,13 @@ mod tests {
         tracing::info!(?args, "args");
 
         let fetcher = OPSuccinctDataFetcher::new_with_rollup_config().await?;
-        let host = initialize_host(Arc::new(fetcher.clone()));
+        let host = EigenDAOPSuccinctHost {
+            fetcher: Arc::new(fetcher.clone()),
+            witness_generator: Arc::new(EigenDAWitnessGenerator::new(
+                fetcher.rpc_config.l1_rpc_client(),
+                true,
+            )),
+        };
         let host_args = host.fetch(args.l2_start_block, args.l2_end_block, None, false).await?;
         let witness_data = host.run(&host_args).await?;
         tracing::info!(?witness_data, "witness_data");

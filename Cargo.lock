@@ -8668,6 +8668,7 @@ dependencies = [
  "op-alloy-rpc-types",
  "op-succinct-bindings",
  "op-succinct-client-utils",
+ "op-succinct-eigenda-host-utils",
  "op-succinct-elfs",
  "op-succinct-ethereum-host-utils",
  "op-succinct-host-utils",
