@@ -6,6 +6,7 @@ pub mod prometheus;
 pub mod proposer;
 pub mod prover;
 pub mod range_optimizer;
+pub mod witness_precacher;
 
 use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::{address, keccak256, Address, FixedBytes, B256, U256};
