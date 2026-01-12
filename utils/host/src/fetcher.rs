@@ -31,7 +31,7 @@ use serde_json::{json, Value};
 
 use crate::L2Output;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 /// The OPSuccinctDataFetcher struct is used to fetch the L2 output data and L2 claim data for a
 /// given block number. It is used to generate the boot info for the native host program.
 /// FIXME: Add retries for all requests (3 retries).

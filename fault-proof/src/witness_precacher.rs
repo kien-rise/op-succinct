@@ -1,13 +1,11 @@
-use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use alloy_primitives::{Address, BlockNumber, B256};
-use anyhow::{bail, Result};
+use alloy_primitives::{BlockNumber, B256};
+use anyhow::{anyhow, bail, Result};
+use hokulea_proof::eigenda_witness::EigenDAWitness;
 use kona_host::{DiskKeyValueStore, KeyValueStore, MemoryKeyValueStore};
-use op_succinct_client_utils::witness::{DefaultWitnessData, EigenDAWitnessData, WitnessData};
+use kona_proof::BootInfo;
+use op_succinct_client_utils::witness::EigenDAWitnessData;
 use op_succinct_eigenda_host_utils::{
     host::EigenDAOPSuccinctHost, witness_generator::EigenDAWitnessGenerator,
 };
@@ -16,14 +14,21 @@ use tokio::sync::{Mutex, OnceCell};
 
 type WitnessPrecacherInFlightTasks = HashMap<B256, Arc<OnceCell<()>>>;
 
-struct WitnessPrecacher<KV: KeyValueStore> {
+#[derive(Debug)]
+pub struct WitnessPrecacher<KV: KeyValueStore> {
     store: Arc<Mutex<KV>>,
     tasks: Arc<Mutex<WitnessPrecacherInFlightTasks>>,
     fetcher: Option<Arc<OPSuccinctDataFetcher>>,
 }
 
+impl<KV: KeyValueStore> Clone for WitnessPrecacher<KV> {
+    fn clone(&self) -> Self {
+        Self { store: self.store.clone(), tasks: self.tasks.clone(), fetcher: self.fetcher.clone() }
+    }
+}
+
 impl WitnessPrecacher<DiskKeyValueStore> {
-    fn new_disk(data_directory: PathBuf) -> Self {
+    pub fn new_disk(data_directory: PathBuf) -> Self {
         Self {
             store: Arc::new(Mutex::new(DiskKeyValueStore::new(data_directory))),
             tasks: Arc::new(Mutex::new(WitnessPrecacherInFlightTasks::new())),
@@ -33,7 +38,7 @@ impl WitnessPrecacher<DiskKeyValueStore> {
 }
 
 impl WitnessPrecacher<MemoryKeyValueStore> {
-    fn new_memory() -> Self {
+    pub fn new_memory() -> Self {
         Self {
             store: Arc::new(Mutex::new(MemoryKeyValueStore::new())),
             tasks: Arc::new(Mutex::new(WitnessPrecacherInFlightTasks::new())),
@@ -43,7 +48,7 @@ impl WitnessPrecacher<MemoryKeyValueStore> {
 }
 
 impl<KV: KeyValueStore> WitnessPrecacher<KV> {
-    fn with_fetcher(mut self, fetcher: Arc<OPSuccinctDataFetcher>) -> Self {
+    pub fn with_fetcher(mut self, fetcher: Arc<OPSuccinctDataFetcher>) -> Self {
         self.fetcher = Some(fetcher);
         self
     }
@@ -56,7 +61,7 @@ impl<KV: KeyValueStore> WitnessPrecacher<KV> {
         B256::from(bytes)
     }
 
-    async fn ensure_witness_precached(
+    pub async fn ensure_witness_precached(
         &self,
         l2_start_block: BlockNumber,
         l2_end_block: BlockNumber,
@@ -78,8 +83,7 @@ impl<KV: KeyValueStore> WitnessPrecacher<KV> {
             let witness_generator = Arc::new(EigenDAWitnessGenerator::new(l1_rpc_client, true));
             let host = EigenDAOPSuccinctHost { fetcher, witness_generator };
             let host_args = host.fetch(l2_start_block, l2_end_block, None, false).await?;
-            let (preimage_store, blob_data) = host.run(&host_args).await?.into_parts();
-            let witness = DefaultWitnessData::from_parts(preimage_store, blob_data);
+            let witness = host.run(&host_args).await?;
             let buffer = rkyv::to_bytes::<rkyv::rancor::Error>(&witness)?;
             (self.store.lock().await).set(key, buffer.into_vec())?;
             Ok(())
@@ -89,17 +93,73 @@ impl<KV: KeyValueStore> WitnessPrecacher<KV> {
         Ok(key)
     }
 
-    async fn get_precached_witness(
+    pub async fn get_precached_witness(
         &self,
         l2_start_block: BlockNumber,
         l2_end_block: BlockNumber,
-    ) -> Result<DefaultWitnessData> {
+    ) -> Result<EigenDAWitnessData> {
         let key = self.ensure_witness_precached(l2_start_block, l2_end_block).await?;
         let buffer = (self.store.lock().await)
             .get(key)
             .ok_or_else(|| anyhow::anyhow!("db entry disappeared"))?;
-        let witness_data = rkyv::from_bytes::<DefaultWitnessData, rkyv::rancor::Error>(&buffer)?;
-        Ok(witness_data)
+        let witness = rkyv::from_bytes::<EigenDAWitnessData, rkyv::rancor::Error>(&buffer)?;
+        Ok(witness)
+    }
+
+    pub async fn complete_witness(
+        &self,
+        witness: EigenDAWitnessData,
+    ) -> Result<EigenDAWitnessData> {
+        let EigenDAWitnessData { preimage_store, blob_data, eigenda_data } = witness;
+
+        let eigenda_witness_bytes =
+            eigenda_data.ok_or_else(|| anyhow!("missing eigenda_witness_bytes"))?;
+        let eigenda_witness: hokulea_proof::eigenda_witness::EigenDAWitness =
+            serde_cbor::from_slice(&eigenda_witness_bytes)?;
+        let (eigenda_preimage_data, kzg_proofs, _) = eigenda_witness.into_preimage();
+
+        let boot_info = BootInfo::load(&preimage_store).await?;
+
+        use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
+        let canoe_provider = CanoeSp1CCReducedProofProvider {
+            eth_rpc_client: (self.fetcher.as_ref())
+                .ok_or_else(|| anyhow::anyhow!("fetcher not set"))?
+                .rpc_config
+                .l1_rpc_client(),
+            mock_mode: false,
+        };
+
+        let preimage_store = Arc::new(preimage_store);
+
+        use canoe_verifier_address_fetcher::CanoeVerifierAddressFetcherDeployedByEigenLabs;
+        let maybe_canoe_proof = hokulea_witgen::from_boot_info_to_canoe_proof(
+            &boot_info,
+            &eigenda_preimage_data,
+            Arc::clone(&preimage_store), // TODO: ask Hokulea maintainer to remove Arc here
+            canoe_provider,
+            CanoeVerifierAddressFetcherDeployedByEigenLabs {},
+        )
+        .await?;
+
+        let maybe_canoe_proof_bytes =
+            maybe_canoe_proof.map(|proof| serde_cbor::to_vec(&proof).expect("serde error"));
+
+        let eigenda_witness = EigenDAWitness::from_preimage(
+            eigenda_preimage_data,
+            kzg_proofs,
+            maybe_canoe_proof_bytes,
+        )?;
+
+        let eigenda_witness_bytes =
+            serde_cbor::to_vec(&eigenda_witness).expect("Failed to serialize EigenDA witness data");
+
+        let witness = EigenDAWitnessData {
+            preimage_store: Arc::unwrap_or_clone(preimage_store),
+            blob_data,
+            eigenda_data: Some(eigenda_witness_bytes),
+        };
+
+        Ok(witness)
     }
 }
 

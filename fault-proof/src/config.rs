@@ -1,6 +1,7 @@
 use std::{
     env,
     num::{NonZeroU8, NonZeroUsize},
+    path::PathBuf,
     str::FromStr,
 };
 
@@ -75,6 +76,9 @@ pub struct ProposerConfig {
 
     /// Configuration for proof provider operations.
     pub proof_provider: ProofProviderConfig,
+
+    /// The directory where witness precacher data is stored.
+    pub witness_precacher_data_dir: PathBuf,
 }
 
 /// Helper function to parse a comma-separated list of addresses
@@ -141,6 +145,9 @@ impl ProposerConfig {
                 .unwrap_or("1".to_string())
                 .parse()?,
             proof_provider: ProofProviderConfig::from_env()?,
+            witness_precacher_data_dir: env::var("WITNESS_PRECACHER_DATA_DIR")
+                .expect("WITNESS_PRECACHER_DATA_DIR not set")
+                .into(),
         })
     }
 
@@ -176,6 +183,7 @@ impl ProposerConfig {
             max_price_per_pgu = self.proof_provider.max_price_per_pgu,
             min_auction_period = self.proof_provider.min_auction_period,
             whitelist = ?self.proof_provider.whitelist,
+            witness_precacher_data_dir = ?self.witness_precacher_data_dir,
             "Proposer configuration loaded"
         );
     }

@@ -14,11 +14,13 @@ use alloy_provider::{Provider, ProviderBuilder};
 use alloy_sol_types::{SolEvent, SolValue};
 use anyhow::{bail, Context, Result};
 use futures::stream::{self, StreamExt, TryStreamExt};
+use kona_host::DiskKeyValueStore;
 use kona_providers_alloy::{
     AlloyChainProvider, AlloyL2ChainProvider, OnlineBeaconClient, OnlineBlobProvider,
 };
 use lru::LruCache;
 use op_succinct_client_utils::boot::BootInfoStruct;
+use op_succinct_eigenda_host_utils::host::EigenDAOPSuccinctHost;
 use op_succinct_elfs::AGGREGATION_ELF;
 use op_succinct_host_utils::{
     fetcher::OPSuccinctDataFetcher,
@@ -50,6 +52,7 @@ use crate::{
     prometheus::ProposerGauge,
     prover::{MockProofProvider, NetworkProofProvider, ProofKeys, ProofProvider},
     range_optimizer::get_target_l2_block_number,
+    witness_precacher::WitnessPrecacher,
     FactoryTrait, L1Provider, L2Provider, L2ProviderTrait,
 };
 
@@ -249,12 +252,12 @@ where
     next_task_id: Arc<AtomicU64>,
     state: Arc<RwLock<ProposerState>>,
     proof_cache: Arc<Mutex<ProofCache>>,
+    witness_precacher: WitnessPrecacher<DiskKeyValueStore>,
 }
 
-impl<P, H> OPSuccinctProposer<P, H>
+impl<P> OPSuccinctProposer<P, EigenDAOPSuccinctHost>
 where
     P: Provider + Clone + Send + Sync + 'static,
-    H: OPSuccinctHost + Clone + Send + Sync + 'static,
 {
     /// Creates a new proposer instance with the provided L1 provider with wallet and factory
     /// contract instance.
@@ -264,7 +267,7 @@ where
         anchor_state_registry: AnchorStateRegistryInstance<P>,
         factory: DisputeGameFactoryInstance<P>,
         fetcher: Arc<OPSuccinctDataFetcher>,
-        host: Arc<H>,
+        host: Arc<EigenDAOPSuccinctHost>,
     ) -> Result<Self> {
         // Set up the network prover.
         let network_signer = get_network_signer(config.use_kms_requester).await?;
@@ -327,6 +330,10 @@ where
                     config.range_split_count.to_usize(),
                 (config.fast_finality_proving_limit + 2) as usize,
             ))),
+            witness_precacher: WitnessPrecacher::new_disk(
+                config.witness_precacher_data_dir.clone(),
+            )
+            .with_fetcher(fetcher.clone()),
         })
     }
 
@@ -487,7 +494,7 @@ where
     async fn validate_anchor_l2_block(
         anchor_l2_block: U256,
         config: &ProposerConfig,
-        host: &H,
+        host: &EigenDAOPSuccinctHost,
         fetcher: &OPSuccinctDataFetcher,
     ) -> Result<()> {
         let finalized_l2_block = host
@@ -1030,21 +1037,25 @@ where
     }
 
     async fn range_proof_stdin(&self, start_block: u64, end_block: u64) -> Result<SP1Stdin> {
-        let host_args = self
-            .host
-            .fetch(start_block, end_block, None, self.config.safe_db_fallback)
-            .await
-            .context("Failed to get host CLI args")?;
+        // let host_args = self
+        //     .host
+        //     .fetch(start_block, end_block, None, self.config.safe_db_fallback)
+        //     .await
+        //     .context("Failed to get host CLI args")?;
 
-        let witness_data = match self.host.run(&host_args).await {
-            Ok(witness) => witness,
-            Err(e) => {
-                tracing::error!("Failed to generate witness: {}", e);
-                return Err(anyhow::anyhow!("Failed to generate witness: {}", e));
-            }
-        };
+        let witness_precached =
+            self.witness_precacher.get_precached_witness(start_block, end_block).await?;
+        let witness_completed = self.witness_precacher.complete_witness(witness_precached).await?;
 
-        let sp1_stdin = match self.host.witness_generator().get_sp1_stdin(witness_data) {
+        // let witness_data = match self.host.run(&host_args).await {
+        //     Ok(witness) => witness,
+        //     Err(e) => {
+        //         tracing::error!("Failed to generate witness: {}", e);
+        //         return Err(anyhow::anyhow!("Failed to generate witness: {}", e));
+        //     }
+        // };
+
+        let sp1_stdin = match self.host.witness_generator().get_sp1_stdin(witness_completed) {
             Ok(stdin) => stdin,
             Err(e) => {
                 tracing::error!("Failed to get proof stdin: {}", e);
@@ -2144,7 +2155,7 @@ where
             }
         }
 
-        let proposer: OPSuccinctProposer<P, H> = self.clone();
+        let proposer: OPSuccinctProposer<P, EigenDAOPSuccinctHost> = self.clone();
         let task_id = self.next_task_id.fetch_add(1, Ordering::Relaxed);
 
         // Get the game block number to include in logs
