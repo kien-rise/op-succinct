@@ -455,6 +455,7 @@ where
                         .games
                         .values()
                         .filter(|game| !game.should_attempt_to_challenge)
+                        .filter(|game| game.proposal_status == ProposalStatus::Unchallenged)
                         .min_by_key(|game| game.index)
                         .cloned()
                 };
