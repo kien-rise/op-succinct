@@ -220,24 +220,24 @@ k256 = { git = "https://github.com/sp1-patches/elliptic-curves", tag = "patch-k2
 
 # We use a [patch] section because some of our dependencies also depend on kona
 [patch."https://github.com/op-rs/kona"]
-kona-cli = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-client = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-derive = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-disc = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-driver = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-engine = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-executor = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-genesis = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-gossip = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-host = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-macros = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-mpt = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-peers = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-preimage = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-proof = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-protocol = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-providers-alloy = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-registry = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-rpc = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-std-fpvm = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
-kona-std-fpvm-proc = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.1" }
+kona-cli = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-client = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-derive = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-disc = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-driver = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-engine = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-executor = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-genesis = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-gossip = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-host = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-macros = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-mpt = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-peers = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-preimage = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-proof = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-protocol = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-providers-alloy = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-registry = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-rpc = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-std-fpvm = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-std-fpvm-proc = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
