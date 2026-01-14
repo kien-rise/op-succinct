@@ -326,14 +326,14 @@ where
 
             self.backup().await;
 
-            // 2. Handle completed tasks.
-            if let Err(e) = self.handle_completed_tasks().await {
-                tracing::warn!("Failed to handle completed tasks: {:?}", e);
-            }
-
-            // 3. Spawn new work (non-blocking).
+            // 2. Spawn new work (non-blocking).
             if let Err(e) = self.spawn_pending_operations().await {
                 tracing::warn!("Failed to spawn pending operations: {:?}", e);
+            }
+
+            // 3. Handle completed tasks.
+            if let Err(e) = self.handle_completed_tasks().await {
+                tracing::warn!("Failed to handle completed tasks: {:?}", e);
             }
 
             // 4. Log task statistics.
