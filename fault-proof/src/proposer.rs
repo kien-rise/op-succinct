@@ -1588,7 +1588,30 @@ where
                 bail!("Game already exists");
             }
 
-            next_l2_block_number_for_proposal += U256::from(1);
+            if self.config.proposal_interval_in_blocks > 0 {
+                next_l2_block_number_for_proposal += U256::from(1);
+            } else {
+                next_l2_block_number_for_proposal =
+                    self.get_next_l2_safe_block_number(next_l2_block_number_for_proposal).await?
+            }
+
+            let finalized_l2_head_block_number = self
+                .host
+                .get_finalized_l2_block_number(
+                    &self.fetcher,
+                    next_l2_block_number_for_proposal.to::<u64>(),
+                )
+                .await?;
+            if finalized_l2_head_block_number
+                .is_none_or(|bn| U256::from(bn) < next_l2_block_number_for_proposal)
+            {
+                bail!(
+                    "Cannot create game: proposed L2 block {} is beyond finalized L2 head {:?}",
+                    next_l2_block_number_for_proposal,
+                    finalized_l2_head_block_number
+                );
+            }
+
             output_root = self
                 .l2_provider
                 .compute_output_root_at_block(next_l2_block_number_for_proposal)
@@ -1896,6 +1919,44 @@ where
         Ok(true)
     }
 
+    async fn get_next_l2_safe_block_number(&self, l2_block_number: U256) -> Result<U256> {
+        tracing::debug!(
+            "get_next_l2_safe_block_number: Starting with l2_block_number={}",
+            l2_block_number
+        );
+
+        let query_block = l2_block_number.to::<u64>() + 1;
+        tracing::debug!(
+            "get_next_l2_safe_block_number: Querying safe L1 block for L2 block {}",
+            query_block
+        );
+
+        let (_, l1_block_number) = self.fetcher.get_safe_l1_block_for_l2_block(query_block).await?;
+        tracing::debug!(
+            "get_next_l2_safe_block_number: Found L1 block number {} for L2 block {}",
+            l1_block_number,
+            query_block
+        );
+
+        tracing::debug!(
+            "get_next_l2_safe_block_number: Fetching L2 safe head from L1 block {}",
+            l1_block_number
+        );
+        let l2_safe_block_number =
+            self.fetcher.get_l2_safe_head_from_l1_block_number(l1_block_number).await?;
+        tracing::debug!(
+            "get_next_l2_safe_block_number: Got L2 safe head block number {}",
+            l2_safe_block_number
+        );
+
+        let result = U256::from(l2_safe_block_number);
+        tracing::debug!(
+            "get_next_l2_safe_block_number: Returning next L2 safe block number {}",
+            result
+        );
+        Ok(result)
+    }
+
     /// Check if we should create a game
     ///
     /// In fast finality mode, prioritizes proving existing games over creating new ones, preventing
@@ -2047,13 +2108,16 @@ where
             (canonical_head_l2_block, parent_game_index)
         };
 
-        let next_l2_block_number_for_proposal =
-            canonical_head_l2_block + U256::from(self.config.proposal_interval_in_blocks);
-
         let finalized_l2_head_block_number = self
             .host
             .get_finalized_l2_block_number(&self.fetcher, canonical_head_l2_block.to::<u64>())
             .await?;
+
+        let next_l2_block_number_for_proposal = if self.config.proposal_interval_in_blocks > 0 {
+            canonical_head_l2_block + U256::from(self.config.proposal_interval_in_blocks)
+        } else {
+            self.get_next_l2_safe_block_number(canonical_head_l2_block).await?
+        };
 
         Ok((
             finalized_l2_head_block_number
