@@ -781,10 +781,8 @@ impl OPSuccinctDataFetcher {
             claimed_l2_output_root,
             claimed_l2_block_number: l2_end_block,
             l2_chain_id: Some(rollup_config.l2_chain_id.id()),
-            l2_node_address: None,
-            l2_rpc_client: Some(self.rpc_config.l2_rpc_client()),
-            l1_node_address: None,
-            l1_rpc_client: Some(self.rpc_config.l1_rpc_client()),
+            l2_rpc: Some(self.rpc_config.l2_rpc_client()),
+            l1_rpc: Some(self.rpc_config.l1_rpc_client()),
             l1_beacon_address,
             data_dir: None, // Use in-memory key-value store.
             native: false,
