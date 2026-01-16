@@ -5,6 +5,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use anyhow::Result;
 use async_trait::async_trait;
+use hokulea_proof::eigenda_witness::EigenDAWitness;
 use kzg_rs::{Blob, Bytes48};
 use preimage_store::PreimageStore;
 use serde::{Deserialize, Serialize};
@@ -62,15 +63,13 @@ impl WitnessData for DefaultWitnessData {
 pub struct EigenDAWitnessData {
     pub preimage_store: PreimageStore,
     pub blob_data: BlobData,
-    // EigenDAWitness.
-    // See https://github.com/Layr-Labs/hokulea/blob/c99e17ec99574a237e10ca2ddb3110acefdb6ca6/crates/proof/src/eigenda_witness.rs#L69.
-    pub eigenda_data: Option<Vec<u8>>,
+    pub eigenda_witness: Option<EigenDAWitness>,
 }
 
 #[async_trait]
 impl WitnessData for EigenDAWitnessData {
     fn from_parts(preimage_store: PreimageStore, blob_data: BlobData) -> Self {
-        Self { preimage_store, blob_data, eigenda_data: None }
+        Self { preimage_store, blob_data, eigenda_witness: None }
     }
 
     fn into_parts(self) -> (PreimageStore, BlobData) {

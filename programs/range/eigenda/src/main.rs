@@ -11,23 +11,22 @@ sp1_zkvm::entrypoint!(main);
 
 use canoe_sp1_cc_verifier::CanoeSp1CCVerifier;
 use canoe_verifier_address_fetcher::CanoeVerifierAddressFetcherDeployedByEigenLabs;
-use hokulea_proof::eigenda_witness::EigenDAWitness;
 use hokulea_zkvm_verification::eigenda_witness_to_preloaded_provider;
 use op_succinct_client_utils::witness::{EigenDAWitnessData, WitnessData};
 use op_succinct_eigenda_client_utils::executor::EigenDAWitnessExecutor;
 use op_succinct_range_utils::run_range_program;
-#[cfg(feature = "tracing-subscriber")]
-use op_succinct_range_utils::setup_tracing;
 use rkyv::rancor::Error;
 
 fn main() {
     #[cfg(feature = "tracing-subscriber")]
-    setup_tracing();
+    op_succinct_range_utils::setup_tracing();
 
     kona_proof::block_on(async move {
         let witness_rkyv_bytes: Vec<u8> = sp1_zkvm::io::read_vec();
-        let witness_data = rkyv::from_bytes::<EigenDAWitnessData, Error>(&witness_rkyv_bytes)
+        let mut witness_data = rkyv::from_bytes::<EigenDAWitnessData, Error>(&witness_rkyv_bytes)
             .expect("Failed to deserialize witness data.");
+        let eigenda_witness =
+            witness_data.eigenda_witness.take().expect("eigenda witness data is not present");
 
         let (oracle, beacon) = witness_data
             .clone()
@@ -35,10 +34,6 @@ fn main() {
             .await
             .expect("Failed to load oracle and blob provider");
 
-        let eigenda_witness: EigenDAWitness = serde_cbor::from_slice(
-            &witness_data.eigenda_data.clone().expect("eigenda witness data is not present"),
-        )
-        .expect("cannot deserialize eigenda witness");
         let preloaded_preimage_provider = eigenda_witness_to_preloaded_provider(
             oracle.clone(),
             CanoeSp1CCVerifier {},
