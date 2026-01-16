@@ -7516,6 +7516,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cfg-if",
+ "hokulea-proof",
  "kona-derive",
  "kona-driver",
  "kona-executor",
@@ -9368,7 +9369,6 @@ dependencies = [
  "op-succinct-eigenda-client-utils",
  "op-succinct-range-utils",
  "rkyv",
- "serde_cbor",
  "sp1-zkvm",
  "tracing-subscriber 0.3.22",
 ]
