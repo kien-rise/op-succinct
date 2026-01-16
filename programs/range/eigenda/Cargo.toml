@@ -10,7 +10,6 @@ repository.workspace = true
 [dependencies]
 # general
 rkyv.workspace = true
-serde_cbor.workspace = true
 
 # kona
 kona-proof.workspace = true
