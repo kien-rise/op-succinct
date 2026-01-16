@@ -53,12 +53,7 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         let mut stdin = SP1Stdin::new();
 
         // If eigenda blob witness data is present, write the canoe proof to stdin
-        if let Some(eigenda_data) = &witness.eigenda_data {
-            let mut eigenda_witness: EigenDAWitness = serde_cbor::from_slice(eigenda_data)
-                .map_err(|e| {
-                    anyhow::anyhow!("Failed to deserialize EigenDA blob witness data: {}", e)
-                })?;
-
+        if let Some(eigenda_witness) = witness.eigenda_witness.as_mut() {
             // Take the canoe proof bytes from the witness data
             if let Some(proof_bytes) = eigenda_witness.canoe_proof_bytes.take() {
                 // Get the canoe SP1 CC client ELF and setup verification key
@@ -71,11 +66,6 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
                     serde_cbor::from_slice(&proof_bytes)
                         .map_err(|e| anyhow::anyhow!("Failed to deserialize canoe proof: {}", e))?;
                 stdin.write_proof(reduced_proof, canoe_vk.vk.clone());
-
-                // Re-serialize the witness data without the proof
-                witness.eigenda_data = Some(serde_cbor::to_vec(&eigenda_witness).map_err(|e| {
-                    anyhow::anyhow!("Failed to serialize sanitized EigenDA data: {}", e)
-                })?);
             }
         }
 
@@ -172,13 +162,10 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             maybe_canoe_proof_bytes,
         )?;
 
-        let eigenda_witness_bytes =
-            serde_cbor::to_vec(&eigenda_witness).expect("Failed to serialize EigenDA witness data");
-
         let witness = EigenDAWitnessData {
             preimage_store: preimage_witness_store.lock().unwrap().clone(),
             blob_data: blob_data.lock().unwrap().clone(),
-            eigenda_data: Some(eigenda_witness_bytes),
+            eigenda_witness: Some(eigenda_witness),
         };
 
         Ok(witness)
