@@ -96,10 +96,10 @@ kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.2
 kona-genesis = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.2.2", default-features = false }
 
 # hana
-hana-blobstream = { git = "https://github.com/celestiaorg/hana", tag = "v1.4.0-mocha" }
-hana-celestia = { git = "https://github.com/celestiaorg/hana", tag = "v1.4.0-mocha" }
-hana-host = { git = "https://github.com/celestiaorg/hana", tag = "v1.4.0-mocha" }
-hana-oracle = { git = "https://github.com/celestiaorg/hana", tag = "v1.4.0-mocha" }
+hana-blobstream = { git = "https://github.com/risechain/hana", tag = "v1.4.0-mocha-rise.1" }
+hana-celestia = { git = "https://github.com/risechain/hana", tag = "v1.4.0-mocha-rise.1" }
+hana-host = { git = "https://github.com/risechain/hana", tag = "v1.4.0-mocha-rise.1" }
+hana-oracle = { git = "https://github.com/risechain/hana", tag = "v1.4.0-mocha-rise.1" }
 
 # hokulea
 hokulea-compute-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "b39a055d4ebf37ee2a998abe72f4860dd3491ff2" }
@@ -220,24 +220,24 @@ k256 = { git = "https://github.com/sp1-patches/elliptic-curves", tag = "patch-k2
 
 # We use a [patch] section because some of our dependencies also depend on kona
 [patch."https://github.com/op-rs/kona"]
-kona-cli = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-client = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-derive = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-disc = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-driver = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-engine = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-executor = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-genesis = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-gossip = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-host = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-macros = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-mpt = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-peers = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-preimage = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-proof = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-protocol = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-providers-alloy = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-registry = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-rpc = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-std-fpvm = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
-kona-std-fpvm-proc = { git = "https://github.com/risechain/kona", tag = "kona-client/v1.2.2-rise.2" }
+kona-cli = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-client = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-derive = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-disc = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-driver = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-engine = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-executor = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-genesis = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-gossip = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-host = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-macros = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-mpt = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-peers = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-preimage = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-proof = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-protocol = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-providers-alloy = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-registry = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-rpc = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-std-fpvm = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-std-fpvm-proc = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }

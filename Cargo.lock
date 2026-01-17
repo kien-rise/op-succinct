@@ -4827,7 +4827,7 @@ dependencies = [
 [[package]]
 name = "hana-blobstream"
 version = "0.1.0"
-source = "git+https://github.com/celestiaorg/hana?tag=v1.4.0-mocha#748005ad397b4db31a9f7ee5288115bedd447e8b"
+source = "git+https://github.com/risechain/hana?tag=v1.4.0-mocha-rise.1#f0b7c7b383812aacfdca1de2e2eccc13134b139b"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -4845,7 +4845,7 @@ dependencies = [
 [[package]]
 name = "hana-celestia"
 version = "0.1.0"
-source = "git+https://github.com/celestiaorg/hana?tag=v1.4.0-mocha#748005ad397b4db31a9f7ee5288115bedd447e8b"
+source = "git+https://github.com/risechain/hana?tag=v1.4.0-mocha-rise.1#f0b7c7b383812aacfdca1de2e2eccc13134b139b"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -4858,7 +4858,7 @@ dependencies = [
 [[package]]
 name = "hana-client"
 version = "0.1.0"
-source = "git+https://github.com/celestiaorg/hana?tag=v1.4.0-mocha#748005ad397b4db31a9f7ee5288115bedd447e8b"
+source = "git+https://github.com/risechain/hana?tag=v1.4.0-mocha-rise.1#f0b7c7b383812aacfdca1de2e2eccc13134b139b"
 dependencies = [
  "alloy-consensus",
  "alloy-evm 0.22.6",
@@ -4885,7 +4885,7 @@ dependencies = [
 [[package]]
 name = "hana-host"
 version = "0.1.0"
-source = "git+https://github.com/celestiaorg/hana?tag=v1.4.0-mocha#748005ad397b4db31a9f7ee5288115bedd447e8b"
+source = "git+https://github.com/risechain/hana?tag=v1.4.0-mocha-rise.1#f0b7c7b383812aacfdca1de2e2eccc13134b139b"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",
@@ -4916,7 +4916,7 @@ dependencies = [
 [[package]]
 name = "hana-oracle"
 version = "0.1.0"
-source = "git+https://github.com/celestiaorg/hana?tag=v1.4.0-mocha#748005ad397b4db31a9f7ee5288115bedd447e8b"
+source = "git+https://github.com/risechain/hana?tag=v1.4.0-mocha-rise.1#f0b7c7b383812aacfdca1de2e2eccc13134b139b"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -4933,7 +4933,7 @@ dependencies = [
 [[package]]
 name = "hana-proofs"
 version = "0.1.0"
-source = "git+https://github.com/celestiaorg/hana?tag=v1.4.0-mocha#748005ad397b4db31a9f7ee5288115bedd447e8b"
+source = "git+https://github.com/risechain/hana?tag=v1.4.0-mocha-rise.1#f0b7c7b383812aacfdca1de2e2eccc13134b139b"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",
@@ -6236,7 +6236,7 @@ dependencies = [
 [[package]]
 name = "kona-cli"
 version = "0.3.2"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-chains",
  "alloy-primitives",
@@ -6256,7 +6256,7 @@ dependencies = [
 [[package]]
 name = "kona-client"
 version = "1.0.2"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6295,7 +6295,7 @@ dependencies = [
 [[package]]
 name = "kona-derive"
 version = "0.4.5"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6316,7 +6316,7 @@ dependencies = [
 [[package]]
 name = "kona-disc"
 version = "0.1.2"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-rlp",
  "backon",
@@ -6335,7 +6335,7 @@ dependencies = [
 [[package]]
 name = "kona-driver"
 version = "0.4.0"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-consensus",
  "alloy-evm 0.22.6",
@@ -6356,7 +6356,7 @@ dependencies = [
 [[package]]
 name = "kona-engine"
 version = "0.1.2"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6394,7 +6394,7 @@ dependencies = [
 [[package]]
 name = "kona-executor"
 version = "0.4.0"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6418,7 +6418,7 @@ dependencies = [
 [[package]]
 name = "kona-genesis"
 version = "0.4.5"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -6438,7 +6438,7 @@ dependencies = [
 [[package]]
 name = "kona-gossip"
 version = "0.1.2"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6471,7 +6471,7 @@ dependencies = [
 [[package]]
 name = "kona-hardforks"
 version = "0.4.5"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -6482,7 +6482,7 @@ dependencies = [
 [[package]]
 name = "kona-host"
 version = "1.0.2"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6530,7 +6530,7 @@ dependencies = [
 [[package]]
 name = "kona-interop"
 version = "0.4.5"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6552,12 +6552,12 @@ dependencies = [
 [[package]]
 name = "kona-macros"
 version = "0.1.2"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 
 [[package]]
 name = "kona-mpt"
 version = "0.3.0"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -6569,7 +6569,7 @@ dependencies = [
 [[package]]
 name = "kona-peers"
 version = "0.1.2"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -6592,7 +6592,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.3.0"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-primitives",
  "async-channel",
@@ -6606,7 +6606,7 @@ dependencies = [
 [[package]]
 name = "kona-proof"
 version = "0.3.0"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6642,7 +6642,7 @@ dependencies = [
 [[package]]
 name = "kona-proof-interop"
 version = "0.2.0"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6674,7 +6674,7 @@ dependencies = [
 [[package]]
 name = "kona-protocol"
 version = "0.4.5"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloc-no-stdlib",
  "alloy-consensus",
@@ -6704,7 +6704,7 @@ dependencies = [
 [[package]]
 name = "kona-providers-alloy"
 version = "0.3.3"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6735,7 +6735,7 @@ dependencies = [
 [[package]]
 name = "kona-registry"
 version = "0.4.5"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-chains",
  "alloy-eips",
@@ -6754,7 +6754,7 @@ dependencies = [
 [[package]]
 name = "kona-rpc"
 version = "0.3.2"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -6784,7 +6784,7 @@ dependencies = [
 [[package]]
 name = "kona-sources"
 version = "0.1.2"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -6814,7 +6814,7 @@ dependencies = [
 [[package]]
 name = "kona-std-fpvm"
 version = "0.2.0"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "async-trait",
  "buddy_system_allocator",
@@ -6826,7 +6826,7 @@ dependencies = [
 [[package]]
 name = "kona-std-fpvm-proc"
 version = "0.2.0"
-source = "git+https://github.com/risechain/kona?tag=kona-client%2Fv1.2.2-rise.2#e10d93d404a68af51415af77f94d6f83455d7f35"
+source = "git+https://github.com/risechain/kona?rev=6bbbc26de4853d3ddb7a0cb92d48a70103894559#6bbbc26de4853d3ddb7a0cb92d48a70103894559"
 dependencies = [
  "cfg-if",
  "kona-std-fpvm",
