@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use hokulea_host_bin::cfg::SingleChainHostWithEigenDA;
 use hokulea_proof::eigenda_witness::EigenDAWitness;
-use kona_host::{KeyValueStore, MemoryKeyValueStore};
+use kona_host::{DiskKeyValueStore, KeyValueStore, MemoryKeyValueStore};
 use kona_proof::BootInfo;
 use op_succinct_client_utils::witness::EigenDAWitnessData;
 use op_succinct_host_utils::{
@@ -133,11 +133,27 @@ impl EigenDAOPSuccinctHost {
             .unwrap_or("false".to_string())
             .parse::<bool>()
             .unwrap_or(false);
+        let store: Option<Arc<Mutex<Box<dyn KeyValueStore + Send + Sync>>>> =
+            match std::env::var("WITNESS_PRECACHER_DATA_DIR") {
+                Ok(dir) => {
+                    if dir.is_empty() {
+                        Some(Arc::new(Mutex::new(Box::new(MemoryKeyValueStore::new()))))
+                    } else {
+                        Some(Arc::new(Mutex::new(Box::new(DiskKeyValueStore::new(dir.into())))))
+                    }
+                }
+                Err(_) => None,
+            };
+        let tasks = if store.is_some() {
+            Some(Arc::new(Mutex::new(WitnessPrecacherInFlightTasks::new())))
+        } else {
+            None
+        };
         Self {
             fetcher,
             witness_generator: Arc::new(EigenDAWitnessGenerator::new(l1_rpc_client, mock_mode)),
-            tasks: Some(Arc::new(Mutex::new(WitnessPrecacherInFlightTasks::new()))),
-            store: Some(Arc::new(Mutex::new(Box::new(MemoryKeyValueStore::new())))), /* TODO: dynamically set this */
+            tasks,
+            store,
         }
     }
 
