@@ -63,8 +63,18 @@ impl OPSuccinctHost for EigenDAOPSuccinctHost {
         end_block: u64,
         safe_db_fallback: bool,
     ) -> Result<SP1Stdin> {
+        tracing::debug!(
+            "range_proof_stdin: start_block={}, end_block={}, safe_db_fallback={}",
+            start_block,
+            end_block,
+            safe_db_fallback
+        );
+
         // - Fallback to the default impl if store is None
         let Some(store) = &self.store else {
+            tracing::debug!(
+                "range_proof_stdin: no store configured, falling back to default implementation"
+            );
             return OPSuccinctHost::range_proof_stdin(
                 self,
                 start_block,
@@ -75,20 +85,33 @@ impl OPSuccinctHost for EigenDAOPSuccinctHost {
         };
 
         // - Get the precached witness
+        tracing::debug!("range_proof_stdin: precaching witness");
         let key = self.precache_witness(start_block, end_block, safe_db_fallback).await?;
+        tracing::debug!("range_proof_stdin: witness precached with key={:?}", key);
 
+        tracing::debug!("range_proof_stdin: retrieving witness from store");
         let witness = match store.lock().await.get(key) {
-            Some(buffer) => rkyv::from_bytes::<EigenDAWitnessData, rkyv::rancor::Error>(&buffer)?,
+            Some(buffer) => {
+                tracing::debug!(
+                    "range_proof_stdin: deserializing witness from buffer (size={})",
+                    buffer.len()
+                );
+                rkyv::from_bytes::<EigenDAWitnessData, rkyv::rancor::Error>(&buffer)?
+            }
             None => anyhow::bail!("db entry disappeared"),
         };
 
         // - Complete the witness
+        tracing::debug!("range_proof_stdin: completing witness");
         let witness_data = self.complete_witness(witness).await?;
+        tracing::debug!("range_proof_stdin: witness completed");
 
+        tracing::debug!("range_proof_stdin: generating SP1 stdin");
         let sp1_stdin = self
             .witness_generator
             .get_sp1_stdin(witness_data)
             .context("Failed to get proof stdin")?;
+        tracing::debug!("range_proof_stdin: SP1 stdin generated successfully");
 
         Ok(sp1_stdin)
     }
