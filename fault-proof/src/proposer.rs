@@ -26,7 +26,6 @@ use op_succinct_host_utils::{
     host::OPSuccinctHost,
     metrics::MetricsGauge,
     network::{determine_network_mode, get_network_signer},
-    witness_generation::WitnessGenerator,
 };
 use op_succinct_proof_utils::get_range_elf_embedded;
 use op_succinct_signer_utils::SignerLock;
@@ -1088,32 +1087,6 @@ where
         Ok((receipt.transaction_hash, total_instruction_cycles, total_sp1_gas))
     }
 
-    async fn range_proof_stdin(&self, start_block: u64, end_block: u64) -> Result<SP1Stdin> {
-        let host_args = self
-            .host
-            .fetch(start_block, end_block, None, self.config.safe_db_fallback)
-            .await
-            .context("Failed to get host CLI args")?;
-
-        let witness_data = match self.host.run(&host_args).await {
-            Ok(witness) => witness,
-            Err(e) => {
-                tracing::error!("Failed to generate witness: {}", e);
-                return Err(anyhow::anyhow!("Failed to generate witness: {}", e));
-            }
-        };
-
-        let sp1_stdin = match self.host.witness_generator().get_sp1_stdin(witness_data) {
-            Ok(stdin) => stdin,
-            Err(e) => {
-                tracing::error!("Failed to get proof stdin: {}", e);
-                return Err(anyhow::anyhow!("Failed to get proof stdin: {}", e));
-            }
-        };
-
-        Ok(sp1_stdin)
-    }
-
     async fn range_proof_stdin_with_cache(
         &self,
         start_block: u64,
@@ -1125,7 +1098,17 @@ where
             return Ok(result.clone());
         }
         tracing::debug!("Cache miss for range_proof_stdin, generating stdin...");
-        let result = self.range_proof_stdin(start_block, end_block).await?;
+        let result = match self
+            .host
+            .range_proof_stdin(start_block, end_block, self.config.safe_db_fallback)
+            .await
+        {
+            Ok(sp1_stdin) => sp1_stdin,
+            Err(e) => {
+                tracing::error!("Failed to generate range proof: {:?}", e);
+                return Err(e);
+            }
+        };
         self.proof_cache.lock().await.range_proof_stdin.push(key, result.clone());
         Ok(result)
     }
