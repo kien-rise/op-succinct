@@ -1,10 +1,11 @@
 use alloy_primitives::B256;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use hana_host::celestia::CelestiaChainHost;
 use hokulea_host_bin::cfg::SingleChainHostWithEigenDA;
 use kona_host::single::{SingleChainHost, SingleChainHostError};
 use kona_preimage::{BidirectionalChannel, Channel};
+use sp1_sdk::SP1Stdin;
 use tokio::task::JoinHandle;
 
 use crate::{fetcher::OPSuccinctDataFetcher, witness_generation::WitnessGenerator};
@@ -103,6 +104,28 @@ pub trait OPSuccinctHost: Send + Sync + 'static {
         server_task.abort();
 
         Ok(witness)
+    }
+
+    /// Compute range proof stdin from start block to end block
+    async fn range_proof_stdin(
+        &self,
+        start_block: u64,
+        end_block: u64,
+        safe_db_fallback: bool,
+    ) -> Result<SP1Stdin> {
+        let host_args = self
+            .fetch(start_block, end_block, None, safe_db_fallback)
+            .await
+            .context("Failed to get host CLI args")?;
+        let witness_data = self
+            .run(&host_args)
+            .await //
+            .context("Failed to generate witness")?;
+        let sp1_stdin = self
+            .witness_generator()
+            .get_sp1_stdin(witness_data)
+            .context("Failed to get proof stdin")?;
+        Ok(sp1_stdin)
     }
 
     /// Get the L1 head hash from the host args.
