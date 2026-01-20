@@ -8564,11 +8564,14 @@ dependencies = [
 name = "op-succinct-eigenda-host-utils"
 version = "3.4.1"
 dependencies = [
+ "alloy-consensus",
  "alloy-eips",
  "alloy-primitives",
+ "alloy-rlp",
  "alloy-rpc-client",
  "anyhow",
  "async-trait",
+ "canoe-provider",
  "canoe-sp1-cc-host",
  "canoe-verifier-address-fetcher",
  "dotenv",
