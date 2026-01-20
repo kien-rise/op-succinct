@@ -26,12 +26,15 @@ hokulea-eigenda.workspace = true
 hokulea-host-bin.workspace = true
 hokulea-proof.workspace = true
 hokulea-witgen.workspace = true
+canoe-provider.workspace = true
 canoe-sp1-cc-host.workspace = true
 canoe-verifier-address-fetcher.workspace = true
 
 # alloy
+alloy-consensus.workspace = true
 alloy-eips.workspace = true
 alloy-primitives.workspace = true
+alloy-rlp.workspace = true
 alloy-rpc-client.workspace = true
 
 # general
