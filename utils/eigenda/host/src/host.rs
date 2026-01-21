@@ -338,7 +338,7 @@ impl EigenDAOPSuccinctHost {
 
         let maybe_canoe_proof_bytes = if let Some(stdin) = maybe_canoe_stdin {
             tracing::debug!("complete_witness: generating canoe proof from stdin");
-            let proof_result = generate_canoe_proof(stdin, true).await?;
+            let proof_result = generate_canoe_proof(stdin, false).await?;
             tracing::debug!("complete_witness: canoe proof generated");
 
             match proof_result.proof {
