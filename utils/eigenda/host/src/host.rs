@@ -218,9 +218,17 @@ impl EigenDAOPSuccinctHost {
             .entry(key.clone())
             .or_insert_with(|| Arc::new(OnceCell::new()))
             .clone();
-        tracing::debug!("precache_witness: checking if witness is already cached");
+
 
         cell.get_or_try_init::<anyhow::Error, _, _>(async move || {
+            // - Check if witness is already in store (e.g., after restart)
+            tracing::debug!("precache_witness: checking if witness exists in store");
+            if store.lock().await.get(key).is_some() {
+                tracing::debug!("precache_witness: witness already exists in store, skipping generation");
+                return Ok(());
+            }
+            tracing::debug!("precache_witness: witness not in store");
+
             tracing::debug!("precache_witness: cache miss, generating witness");
             let host = EigenDAOPSuccinctHost {
                 fetcher: Arc::clone(&self.fetcher),
