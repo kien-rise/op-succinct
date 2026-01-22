@@ -87,6 +87,7 @@ pub enum GameEventualValidityError {
 #[derive(Clone, Debug)]
 pub enum TaskInfo {
     GameCreation { block_number: U256 },
+    GamePrecaching { game_address: Address },
     GameProving { game_address: Address, is_defense: bool },
     GameResolution,
     BondClaim,
@@ -1670,6 +1671,15 @@ where
             .count() as u64
     }
 
+    /// Count active precaching tasks
+    async fn count_active_precaching_tasks(&self) -> u64 {
+        let tasks = self.tasks.lock().await;
+        tasks
+            .iter()
+            .filter(|(_, (_, info))| matches!(info, TaskInfo::GamePrecaching { .. }))
+            .count() as u64
+    }
+
     /// Spawn a dedicated metrics collection task
     fn spawn_metrics_collector(&self) {
         let proposer_metrics = self.clone();
@@ -1725,6 +1735,9 @@ where
             TaskInfo::GameCreation { .. } => {
                 ProposerGauge::GameCreationError.increment(1.0);
             }
+            TaskInfo::GamePrecaching { .. } => {
+                ProposerGauge::GamePrecachingError.increment(1.0);
+            }
             TaskInfo::GameProving { .. } => {
                 ProposerGauge::GameProvingError.increment(1.0);
             }
@@ -1759,6 +1772,13 @@ where
             Ok(true) => tracing::info!("Successfully spawned game defense tasks"),
             Ok(false) => tracing::debug!("No games need defense or task already active"),
             Err(e) => tracing::warn!("Failed to spawn game defense tasks: {:?}", e),
+        }
+
+        // Check if we should precache games
+        match self.spawn_game_precaching_tasks().await {
+            Ok(true) => tracing::info!("Successfully spawned game precaching tasks"),
+            Ok(false) => tracing::debug!("No games need precaching or task already active"),
+            Err(e) => tracing::warn!("Failed to spawn game precaching tasks: {:?}", e),
         }
 
         // Spawn game resolution task
@@ -1797,12 +1817,17 @@ where
         let tasks = self.tasks.lock().await;
         let active_count = tasks.len();
         if active_count > 0 {
-            let mut task_counts: HashMap<&str, usize> = HashMap::new();
+            let mut task_counts: BTreeMap<&str, usize> = BTreeMap::new();
+            let mut precaching_games: Vec<String> = Vec::new();
             let mut proving_games: Vec<String> = Vec::new();
 
             for (_, (_, info)) in tasks.iter() {
                 let task_type = match info {
                     TaskInfo::GameCreation { .. } => "GameCreation",
+                    TaskInfo::GamePrecaching { game_address } => {
+                        precaching_games.push(format!("{game_address:?}"));
+                        "GamePrecaching"
+                    }
                     TaskInfo::GameProving { game_address, .. } => {
                         proving_games.push(format!("{game_address:?}"));
                         "GameProving"
@@ -1819,6 +1844,11 @@ where
                 .collect();
 
             tracing::info!("Active tasks: {} ({})", active_count, task_types.join(", "));
+
+            // Log specific games being precached
+            if !precaching_games.is_empty() {
+                tracing::info!("Games being precached: {}", precaching_games.join(", "));
+            }
 
             // Log specific games being proven
             if !proving_games.is_empty() {
@@ -2189,11 +2219,72 @@ where
         Ok(tasks_spawned)
     }
 
+    #[tracing::instrument(name = "[[Precaching]]", skip(self))]
+    async fn spawn_game_precaching_tasks(&self) -> Result<bool> {
+        if self.count_active_defense_tasks().await > 0 {
+            tracing::info!("Found defense tasks, skipping game precaching");
+            return Ok(false);
+        }
+
+        let mut candidates = (self.state.read().await.games)
+            .values()
+            .filter(|game| game.status == GameStatus::IN_PROGRESS)
+            .filter(|game| matches!(game.proposal_status, ProposalStatus::Unchallenged))
+            .filter(|game| game.is_provable)
+            .map(|game| (game.index, game.address, game.deadline))
+            .collect::<Vec<_>>();
+
+        // NOTE: RISE: Sort by deadline in descending order (u64) to prioritize the latest games.
+        // This may seem counterintuitive, but the precacher is currently slower than the batcher.
+        // By focusing on newer games, we maximize how many can be precached, accepting that some
+        // will be missed. Once precaching catches up, we will switch to prioritizing the
+        // oldest games instead.
+        candidates.sort_unstable_by_key(|(_, _, deadline)| std::cmp::Reverse(*deadline));
+
+        let mut active_precaching_tasks_count = self.count_active_precaching_tasks().await;
+        let max_concurrent = self.config.max_concurrent_precaching_tasks;
+
+        let mut tasks_spawned = false;
+
+        for (index, game_address, _) in candidates {
+            if active_precaching_tasks_count >= max_concurrent {
+                tracing::debug!(
+                    "The max concurrent precaching tasks count ({}) has been reached",
+                    max_concurrent
+                );
+                break;
+            }
+
+            if self.has_active_precaching_for_game(game_address).await {
+                continue;
+            }
+
+            tracing::info!(
+                game_address = ?game_address,
+                game_index = %index,
+                "Spawning precaching for unchallenged game"
+            );
+            self.spawn_game_precaching_task(game_address).await?;
+            active_precaching_tasks_count += 1;
+            tasks_spawned = true;
+        }
+
+        Ok(tasks_spawned)
+    }
+
     /// Check if there's an active proving task for a specific game
     async fn has_active_proving_for_game(&self, game_address: Address) -> bool {
         let tasks = self.tasks.lock().await;
         tasks.values().any(|(_, info)| {
             matches!(info, TaskInfo::GameProving { game_address: addr, .. } if *addr == game_address)
+        })
+    }
+
+    /// Check if there's an active precaching task for a specific game
+    async fn has_active_precaching_for_game(&self, game_address: Address) -> bool {
+        let tasks = self.tasks.lock().await;
+        tasks.values().any(|(_, info)| {
+            matches!(info, TaskInfo::GamePrecaching { game_address: addr, .. } if *addr == game_address)
         })
     }
 
@@ -2283,6 +2374,46 @@ where
         };
 
         let task_info = TaskInfo::GameProving { game_address, is_defense };
+        self.tasks.lock().await.insert(task_id, (handle, task_info));
+        Ok(())
+    }
+
+    async fn spawn_game_precaching_task(&self, game_address: Address) -> Result<()> {
+        let host = self.host.clone();
+        let task_id = self.next_task_id.fetch_add(1, Ordering::Relaxed);
+        let safe_db_fallback = self.config.safe_db_fallback;
+
+        // Get the game block number to include in logs
+        let game = OPSuccinctFaultDisputeGame::new(game_address, self.l1_provider.clone());
+        let starting_l2_block_number = game.startingBlockNumber().call().await?;
+        let l2_block_number = game.l2BlockNumber().call().await?;
+        let start_block = starting_l2_block_number.to::<u64>();
+        let end_block = l2_block_number.to::<u64>();
+
+        tracing::info!(
+            "Spawning game precaching task {} for game {:?} (blocks {}-{})",
+            task_id,
+            game_address,
+            start_block,
+            end_block
+        );
+
+        let handle = tokio::spawn(async move {
+            let start_time = std::time::Instant::now();
+            let cache_key = host.precache_witness(start_block, end_block, safe_db_fallback).await?;
+
+            tracing::info!(
+                game_address = ?game_address,
+                l2_block_start = start_block,
+                l2_block_end = end_block,
+                duration_s = start_time.elapsed().as_secs_f64(),
+                cache_key = ?cache_key,
+                "Game precached successfully"
+            );
+            Ok(())
+        });
+
+        let task_info = TaskInfo::GamePrecaching { game_address };
         self.tasks.lock().await.insert(task_id, (handle, task_info));
         Ok(())
     }
