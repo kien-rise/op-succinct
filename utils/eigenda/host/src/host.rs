@@ -20,7 +20,7 @@ use op_succinct_host_utils::{
 use sp1_sdk::{SP1Proof, SP1Stdin};
 use tokio::sync::{Mutex, OnceCell};
 
-use crate::witness_generator::EigenDAWitnessGenerator;
+use crate::witness_generator::{CanoeProofMode, EigenDAWitnessGenerator};
 
 type WitnessPrecacherInFlightTasks = HashMap<B256, Arc<OnceCell<()>>>;
 
@@ -179,12 +179,12 @@ impl OPSuccinctHost for EigenDAOPSuccinctHost {
                 fetcher: Arc::clone(&self.fetcher),
                 witness_generator: Arc::new(EigenDAWitnessGenerator::new(
                     self.fetcher.rpc_config.l1_rpc_client(),
-                    true, // force mock mode
+                    CanoeProofMode::Disabled, // force empty mode
                 )),
                 tasks: None,
                 store: None,
             };
-            tracing::debug!("precache_witness: created host with mock mode");
+            tracing::debug!("precache_witness: created host with canoe proof disabled");
 
             tracing::debug!("precache_witness: fetching host args");
             let host_args = host.fetch(start_block, end_block, None, safe_db_fallback).await?;
@@ -335,9 +335,13 @@ impl EigenDAOPSuccinctHost {
         } else {
             None
         };
+        let canoe_proof_mode = if mock_mode { CanoeProofMode::Mock } else { CanoeProofMode::Real };
         Self {
             fetcher,
-            witness_generator: Arc::new(EigenDAWitnessGenerator::new(l1_rpc_client, mock_mode)),
+            witness_generator: Arc::new(EigenDAWitnessGenerator::new(
+                l1_rpc_client,
+                canoe_proof_mode,
+            )),
             tasks,
             store,
         }

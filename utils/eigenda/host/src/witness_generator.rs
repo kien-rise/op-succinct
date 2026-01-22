@@ -33,14 +33,31 @@ type WitnessExecutor = EigenDAWitnessExecutor<
     OracleEigenDAPreimageProvider<DefaultOracleBase>,
 >;
 
+#[derive(Debug, Clone, Copy)]
+pub enum CanoeProofMode {
+    Disabled,
+    Mock,
+    Real,
+}
+
+impl CanoeProofMode {
+    pub fn as_mock_flag(self) -> Option<bool> {
+        match self {
+            CanoeProofMode::Disabled => None,
+            CanoeProofMode::Mock => Some(true),
+            CanoeProofMode::Real => Some(false),
+        }
+    }
+}
+
 pub struct EigenDAWitnessGenerator {
     l1_rpc_client: RpcClient,
-    mock_mode: bool,
+    canoe_proof_mode: CanoeProofMode,
 }
 
 impl EigenDAWitnessGenerator {
-    pub fn new(l1_rpc_client: RpcClient, mock_mode: bool) -> Self {
-        Self { l1_rpc_client, mock_mode }
+    pub fn new(l1_rpc_client: RpcClient, canoe_proof_mode: CanoeProofMode) -> Self {
+        Self { l1_rpc_client, canoe_proof_mode }
     }
 }
 
@@ -142,18 +159,23 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         // Generate canoe proofs using the reduced proof provider for proof aggregation
         tracing::debug!("Generating canoe proofs");
         use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
-        let canoe_provider = CanoeSp1CCReducedProofProvider {
-            eth_rpc_client: self.l1_rpc_client.clone(),
-            mock_mode: self.mock_mode,
+        let maybe_canoe_proof = match self.canoe_proof_mode.as_mock_flag() {
+            None => None,
+            Some(mock_mode) => {
+                let canoe_provider = CanoeSp1CCReducedProofProvider {
+                    eth_rpc_client: self.l1_rpc_client.clone(),
+                    mock_mode,
+                };
+                hokulea_witgen::from_boot_info_to_canoe_proof(
+                    &boot_info,
+                    &eigenda_preimage_data,
+                    oracle.as_ref(),
+                    canoe_provider,
+                    CanoeVerifierAddressFetcherDeployedByEigenLabs {},
+                )
+                .await?
+            }
         };
-        let maybe_canoe_proof = hokulea_witgen::from_boot_info_to_canoe_proof(
-            &boot_info,
-            &eigenda_preimage_data,
-            oracle.as_ref(),
-            canoe_provider,
-            CanoeVerifierAddressFetcherDeployedByEigenLabs {},
-        )
-        .await?;
         tracing::debug!("Canoe proof generation completed");
 
         let maybe_canoe_proof_bytes =
