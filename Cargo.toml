@@ -102,16 +102,16 @@ hana-host = { git = "https://github.com/risechain/hana", tag = "v1.4.0-mocha-ris
 hana-oracle = { git = "https://github.com/risechain/hana", tag = "v1.4.0-mocha-rise.1" }
 
 # hokulea
-hokulea-compute-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "d64711b4196c28e5ea0f4f101f846520ae5c4df8" }
-hokulea-eigenda = { git = "https://github.com/Layr-Labs/hokulea", rev = "d64711b4196c28e5ea0f4f101f846520ae5c4df8" }
-hokulea-host-bin = { git = "https://github.com/Layr-Labs/hokulea", rev = "d64711b4196c28e5ea0f4f101f846520ae5c4df8" }
-hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "d64711b4196c28e5ea0f4f101f846520ae5c4df8" }
-hokulea-witgen = { git = "https://github.com/Layr-Labs/hokulea", rev = "d64711b4196c28e5ea0f4f101f846520ae5c4df8" }
-hokulea-zkvm-verification = { git = "https://github.com/Layr-Labs/hokulea", rev = "d64711b4196c28e5ea0f4f101f846520ae5c4df8" }
-canoe-provider = { git = "https://github.com/Layr-Labs/hokulea", rev = "d64711b4196c28e5ea0f4f101f846520ae5c4df8" }
-canoe-sp1-cc-host = { git = "https://github.com/Layr-Labs/hokulea", rev = "d64711b4196c28e5ea0f4f101f846520ae5c4df8" }
-canoe-sp1-cc-verifier = { git = "https://github.com/Layr-Labs/hokulea", rev = "d64711b4196c28e5ea0f4f101f846520ae5c4df8" }
-canoe-verifier-address-fetcher = { git = "https://github.com/Layr-Labs/hokulea", rev = "d64711b4196c28e5ea0f4f101f846520ae5c4df8" }
+hokulea-compute-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "d0f015fc94ac451725f539cbb782870f876ab5e4" }
+hokulea-eigenda = { git = "https://github.com/Layr-Labs/hokulea", rev = "d0f015fc94ac451725f539cbb782870f876ab5e4" }
+hokulea-host-bin = { git = "https://github.com/Layr-Labs/hokulea", rev = "d0f015fc94ac451725f539cbb782870f876ab5e4" }
+hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "d0f015fc94ac451725f539cbb782870f876ab5e4" }
+hokulea-witgen = { git = "https://github.com/Layr-Labs/hokulea", rev = "d0f015fc94ac451725f539cbb782870f876ab5e4" }
+hokulea-zkvm-verification = { git = "https://github.com/Layr-Labs/hokulea", rev = "d0f015fc94ac451725f539cbb782870f876ab5e4" }
+canoe-provider = { git = "https://github.com/Layr-Labs/hokulea", rev = "d0f015fc94ac451725f539cbb782870f876ab5e4" }
+canoe-sp1-cc-host = { git = "https://github.com/Layr-Labs/hokulea", rev = "d0f015fc94ac451725f539cbb782870f876ab5e4" }
+canoe-sp1-cc-verifier = { git = "https://github.com/Layr-Labs/hokulea", rev = "d0f015fc94ac451725f539cbb782870f876ab5e4" }
+canoe-verifier-address-fetcher = { git = "https://github.com/Layr-Labs/hokulea", rev = "d0f015fc94ac451725f539cbb782870f876ab5e4" }
 
 # op-succinct
 op-succinct-prove = { path = "scripts/prove" }
@@ -221,24 +221,24 @@ k256 = { git = "https://github.com/sp1-patches/elliptic-curves", tag = "patch-k2
 
 # We use a [patch] section because some of our dependencies also depend on kona
 [patch."https://github.com/op-rs/kona"]
-kona-cli = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-client = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-derive = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-disc = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-driver = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-engine = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-executor = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-genesis = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-gossip = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-host = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-macros = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-mpt = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-peers = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-preimage = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-proof = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-protocol = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-providers-alloy = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-registry = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-rpc = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-std-fpvm = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
-kona-std-fpvm-proc = { git = "https://github.com/risechain/kona", rev = "6bbbc26de4853d3ddb7a0cb92d48a70103894559" }
+kona-cli = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-client = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-derive = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-disc = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-driver = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-engine = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-executor = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-genesis = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-gossip = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-host = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-macros = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-mpt = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-peers = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-preimage = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-proof = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-protocol = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-providers-alloy = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-registry = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-rpc = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-std-fpvm = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
+kona-std-fpvm-proc = { git = "https://github.com/risechain/kona", rev = "b8f4c86ea1e8018c85a29d5edb604a93944ca867" }
