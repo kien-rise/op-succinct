@@ -84,6 +84,7 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         preimage_chan: NativeChannel,
         hint_chan: NativeChannel,
     ) -> Result<Self::WitnessData> {
+        tracing::debug!("Starting EigenDAWitnessGenerator::run");
         let preimage_witness_store = Arc::new(std::sync::Mutex::new(PreimageStore::default()));
         let blob_data = Arc::new(std::sync::Mutex::new(BlobData::default()));
 
@@ -113,6 +114,7 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
 
         let (boot_info, input) = get_inputs_for_pipeline(oracle.clone()).await?;
         if let Some((cursor, l1_provider, l2_provider)) = input {
+            tracing::debug!("Creating and running witness pipeline");
             let rollup_config = Arc::new(boot_info.rollup_config.clone());
             let l1_config = Arc::new(boot_info.l1_config.clone());
             let pipeline = WitnessExecutorTrait::create_pipeline(
@@ -128,14 +130,17 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             .await?;
             WitnessExecutorTrait::run(&executor, boot_info.clone(), pipeline, cursor, l2_provider)
                 .await?;
+            tracing::debug!("Pipeline execution completed");
         }
 
         // Extract the EigenDA preimage data
         let eigenda_preimage_data = std::mem::take(&mut *eigenda_preimage.lock().unwrap());
 
+        tracing::debug!("Creating KZG proofs for EigenDA preimage");
         let kzg_proofs = create_kzg_proofs_for_eigenda_preimage(&eigenda_preimage_data);
 
         // Generate canoe proofs using the reduced proof provider for proof aggregation
+        tracing::debug!("Generating canoe proofs");
         use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
         let canoe_provider = CanoeSp1CCReducedProofProvider {
             eth_rpc_client: self.l1_rpc_client.clone(),
@@ -149,6 +154,7 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             CanoeVerifierAddressFetcherDeployedByEigenLabs {},
         )
         .await?;
+        tracing::debug!("Canoe proof generation completed");
 
         let maybe_canoe_proof_bytes =
             maybe_canoe_proof.map(|proof| serde_cbor::to_vec(&proof).expect("serde error"));
@@ -165,6 +171,7 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
             eigenda_witness: Some(eigenda_witness),
         };
 
+        tracing::debug!("EigenDAWitnessGenerator::run completed successfully");
         Ok(witness)
     }
 }
