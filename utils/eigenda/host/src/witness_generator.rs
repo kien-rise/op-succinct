@@ -178,8 +178,13 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         };
         tracing::debug!("Canoe proof generation completed");
 
-        let maybe_canoe_proof_bytes =
-            maybe_canoe_proof.map(|proof| serde_cbor::to_vec(&proof).expect("serde error"));
+        let maybe_canoe_proof_bytes = if let Some(proof) = maybe_canoe_proof {
+            Some(serde_cbor::to_vec(&proof)?)
+        } else if matches!(self.canoe_proof_mode, CanoeProofMode::Disabled) {
+            Some(vec![])
+        } else {
+            None
+        };
 
         let eigenda_witness = EigenDAWitness::from_preimage(
             eigenda_preimage_data,
