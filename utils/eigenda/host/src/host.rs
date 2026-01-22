@@ -120,72 +120,23 @@ impl OPSuccinctHost for EigenDAOPSuccinctHost {
         Ok(sp1_stdin)
     }
 
-    fn get_l1_head_hash(&self, args: &Self::Args) -> Option<B256> {
-        Some(args.kona_cfg.l1_head)
-    }
-
-    async fn get_finalized_l2_block_number(
-        &self,
-        fetcher: &OPSuccinctDataFetcher,
-        _: u64,
-    ) -> Result<Option<u64>> {
-        let finalized_l2_block_number = fetcher.get_l2_header(BlockId::finalized()).await?;
-        Ok(Some(finalized_l2_block_number.number))
-    }
-
-    async fn calculate_safe_l1_head(
-        &self,
-        fetcher: &OPSuccinctDataFetcher,
-        l2_end_block: u64,
-        safe_db_fallback: bool,
-    ) -> Result<B256> {
-        // For EigenDA, use a similar approach to Ethereum DA with a conservative offset.
-        let (_, l1_head_number) = fetcher.get_l1_head(l2_end_block, safe_db_fallback).await?;
-
-        // Add a buffer for EigenDA similar to Ethereum DA.
-        let l1_head_number = l1_head_number + 20;
-
-        // Ensure we don't exceed the finalized L1 header.
-        let finalized_l1_header = fetcher.get_l1_header(BlockId::finalized()).await?;
-        let safe_l1_head_number = std::cmp::min(l1_head_number, finalized_l1_header.number);
-
-        Ok(fetcher.get_l1_header(safe_l1_head_number.into()).await?.hash_slow())
-    }
-}
-
-impl EigenDAOPSuccinctHost {
-    pub fn new(fetcher: Arc<OPSuccinctDataFetcher>) -> Self {
-        let l1_rpc_client = fetcher.rpc_config.l1_rpc_client();
-        let mock_mode = std::env::var("OP_SUCCINCT_MOCK")
-            .unwrap_or("false".to_string())
-            .parse::<bool>()
-            .unwrap_or(false);
-        let store: Option<Arc<Mutex<Box<dyn KeyValueStore + Send + Sync>>>> =
-            match std::env::var("WITNESS_PRECACHER_DATA_DIR") {
-                Ok(dir) => {
-                    if dir.is_empty() {
-                        Some(Arc::new(Mutex::new(Box::new(MemoryKeyValueStore::new()))))
-                    } else {
-                        Some(Arc::new(Mutex::new(Box::new(DiskKeyValueStore::new(dir.into())))))
-                    }
-                }
-                Err(_) => None,
-            };
-        let tasks = if store.is_some() {
-            Some(Arc::new(Mutex::new(WitnessPrecacherInFlightTasks::new())))
-        } else {
-            None
+    async fn is_witness_precached(&self, start_block: u64, end_block: u64) -> Result<bool> {
+        let (Some(tasks), Some(store)) = (&self.tasks, &self.store) else {
+            anyhow::bail!(
+                "witness precaching is not available on this host due to unconfigured storage"
+            );
         };
-        Self {
-            fetcher,
-            witness_generator: Arc::new(EigenDAWitnessGenerator::new(l1_rpc_client, mock_mode)),
-            tasks,
-            store,
+        let key = self.get_cache_key(start_block, end_block);
+        if (tasks.lock().await).contains_key(&key) {
+            return Ok(true);
         }
+        if store.lock().await.get(key).is_some() {
+            return Ok(true);
+        }
+        Ok(false)
     }
 
-    // TODO: call this
-    pub async fn precache_witness(
+    async fn precache_witness(
         &self,
         start_block: u64,
         end_block: u64,
@@ -203,14 +154,7 @@ impl EigenDAOPSuccinctHost {
         };
 
         // - Calculate cache key
-        let key = {
-            // TODO: include game hashes here
-            let mut bytes = [0u8; 32];
-            bytes[0] = 0xc1;
-            bytes[16..24].copy_from_slice(&start_block.to_be_bytes());
-            bytes[24..32].copy_from_slice(&end_block.to_be_bytes());
-            B256::from(bytes)
-        };
+        let key = self.get_cache_key(start_block, end_block);
         tracing::debug!("precache_witness: calculated cache key={:?}", key);
 
         // - Ensure witness is precached
@@ -219,12 +163,13 @@ impl EigenDAOPSuccinctHost {
             .or_insert_with(|| Arc::new(OnceCell::new()))
             .clone();
 
-
         cell.get_or_try_init::<anyhow::Error, _, _>(async move || {
             // - Check if witness is already in store (e.g., after restart)
             tracing::debug!("precache_witness: checking if witness exists in store");
             if store.lock().await.get(key).is_some() {
-                tracing::debug!("precache_witness: witness already exists in store, skipping generation");
+                tracing::debug!(
+                    "precache_witness: witness already exists in store, skipping generation"
+                );
                 return Ok(());
             }
             tracing::debug!("precache_witness: witness not in store");
@@ -332,6 +277,79 @@ impl EigenDAOPSuccinctHost {
 
         tracing::debug!("precache_witness: completed successfully, returning key={:?}", key);
         Ok(key)
+    }
+
+    fn get_l1_head_hash(&self, args: &Self::Args) -> Option<B256> {
+        Some(args.kona_cfg.l1_head)
+    }
+
+    async fn get_finalized_l2_block_number(
+        &self,
+        fetcher: &OPSuccinctDataFetcher,
+        _: u64,
+    ) -> Result<Option<u64>> {
+        let finalized_l2_block_number = fetcher.get_l2_header(BlockId::finalized()).await?;
+        Ok(Some(finalized_l2_block_number.number))
+    }
+
+    async fn calculate_safe_l1_head(
+        &self,
+        fetcher: &OPSuccinctDataFetcher,
+        l2_end_block: u64,
+        safe_db_fallback: bool,
+    ) -> Result<B256> {
+        // For EigenDA, use a similar approach to Ethereum DA with a conservative offset.
+        let (_, l1_head_number) = fetcher.get_l1_head(l2_end_block, safe_db_fallback).await?;
+
+        // Add a buffer for EigenDA similar to Ethereum DA.
+        let l1_head_number = l1_head_number + 20;
+
+        // Ensure we don't exceed the finalized L1 header.
+        let finalized_l1_header = fetcher.get_l1_header(BlockId::finalized()).await?;
+        let safe_l1_head_number = std::cmp::min(l1_head_number, finalized_l1_header.number);
+
+        Ok(fetcher.get_l1_header(safe_l1_head_number.into()).await?.hash_slow())
+    }
+}
+
+impl EigenDAOPSuccinctHost {
+    pub fn new(fetcher: Arc<OPSuccinctDataFetcher>) -> Self {
+        let l1_rpc_client = fetcher.rpc_config.l1_rpc_client();
+        let mock_mode = std::env::var("OP_SUCCINCT_MOCK")
+            .unwrap_or("false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
+        let store: Option<Arc<Mutex<Box<dyn KeyValueStore + Send + Sync>>>> =
+            match std::env::var("WITNESS_PRECACHER_DATA_DIR") {
+                Ok(dir) => {
+                    if dir.is_empty() {
+                        Some(Arc::new(Mutex::new(Box::new(MemoryKeyValueStore::new()))))
+                    } else {
+                        Some(Arc::new(Mutex::new(Box::new(DiskKeyValueStore::new(dir.into())))))
+                    }
+                }
+                Err(_) => None,
+            };
+        let tasks = if store.is_some() {
+            Some(Arc::new(Mutex::new(WitnessPrecacherInFlightTasks::new())))
+        } else {
+            None
+        };
+        Self {
+            fetcher,
+            witness_generator: Arc::new(EigenDAWitnessGenerator::new(l1_rpc_client, mock_mode)),
+            tasks,
+            store,
+        }
+    }
+
+    fn get_cache_key(&self, start_block: u64, end_block: u64) -> B256 {
+        let mut bytes = [0u8; 32];
+        bytes[0] = 0xc1;
+        // TODO: include game hashes here
+        bytes[16..24].copy_from_slice(&start_block.to_be_bytes());
+        bytes[24..32].copy_from_slice(&end_block.to_be_bytes());
+        B256::from(bytes)
     }
 
     pub async fn complete_witness(

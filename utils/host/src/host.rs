@@ -128,6 +128,19 @@ pub trait OPSuccinctHost: Send + Sync + 'static {
         Ok(sp1_stdin)
     }
 
+    async fn is_witness_precached(&self, _start_block: u64, _end_block: u64) -> Result<bool> {
+        anyhow::bail!("witness precaching not supported");
+    }
+
+    async fn precache_witness(
+        &self,
+        _start_block: u64,
+        _end_block: u64,
+        _safe_db_fallback: bool,
+    ) -> Result<B256> {
+        anyhow::bail!("witness precaching not supported");
+    }
+
     /// Get the L1 head hash from the host args.
     fn get_l1_head_hash(&self, args: &Self::Args) -> Option<B256>;
 
