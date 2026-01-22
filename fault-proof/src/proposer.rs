@@ -125,6 +125,7 @@ pub struct Game {
     pub index: U256,
     pub address: Address,
     pub parent_index: u32,
+    pub l2_start_block: U256,
     pub l2_block: U256,
     pub status: GameStatus,
     pub proposal_status: ProposalStatus,
@@ -132,6 +133,7 @@ pub struct Game {
     pub should_attempt_to_resolve: bool,
     pub should_attempt_to_claim_bond: bool,
     pub is_provable: bool,
+    pub is_precached: bool,
 }
 
 /// Central cache of the proposer's view of dispute games.
@@ -1411,6 +1413,7 @@ where
 
         let contract = OPSuccinctFaultDisputeGame::new(game_address, self.l1_provider.clone());
 
+        let l2_start_block = contract.startingBlockNumber().call().await?;
         let l2_block = contract.l2BlockNumber().call().await?;
         let output_root = self.l2_provider.compute_output_root_at_block(l2_block).await?;
         let claim = contract.rootClaim().call().await?;
@@ -1477,16 +1480,21 @@ where
             }
         };
 
+        let is_precached =
+            self.host.is_witness_precached(l2_start_block.to(), l2_block.to()).await?;
+
         tracing::info!(
             game_index = %index,
             ?game_type,
             ?game_address,
             parent_index = %parent_index,
+            l2_start_block = %l2_start_block,
             l2_block = %l2_block,
             ?status,
             ?proposal_status,
             deadline = %deadline,
             is_provable,
+            is_precached,
             "Valid game: adding to cache"
         );
 
@@ -1497,6 +1505,7 @@ where
                 index,
                 address: game_address,
                 parent_index,
+                l2_start_block,
                 l2_block,
                 status,
                 proposal_status,
@@ -1504,6 +1513,7 @@ where
                 should_attempt_to_resolve: false,
                 should_attempt_to_claim_bond: false,
                 is_provable,
+                is_precached,
             },
         );
 
@@ -2230,6 +2240,7 @@ where
             .filter(|game| game.status == GameStatus::IN_PROGRESS)
             .filter(|game| matches!(game.proposal_status, ProposalStatus::Unchallenged))
             .filter(|game| game.is_provable)
+            .filter(|game| !game.is_precached)
             .map(|game| (game.index, game.address, game.deadline))
             .collect::<Vec<_>>();
 
