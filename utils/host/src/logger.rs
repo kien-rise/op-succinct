@@ -47,6 +47,7 @@ fn build_env_filter() -> EnvFilter {
 /// - `OTLP_ENABLED`: Whether to enable OpenTelemetry export (defaults to false)
 /// - `RUST_LOG`: Standard Rust log level configuration
 /// - `LOG_FORMAT`: Output format (pretty or json, defaults to pretty)
+/// - `WITH_TARGET`: Whether to include target in log output (defaults to false)
 pub fn setup_logger() {
     INIT.get_or_init(|| {
         let logger_name = std::env::var("LOGGER_NAME").ok();
@@ -54,6 +55,11 @@ pub fn setup_logger() {
             std::env::var("OTLP_ENDPOINT").unwrap_or_else(|_| "http://localhost:4317".to_string());
 
         let otlp_enabled = std::env::var("OTLP_ENABLED")
+            .unwrap_or("false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
+
+        let with_target = std::env::var("WITH_TARGET")
             .unwrap_or("false".to_string())
             .parse::<bool>()
             .unwrap_or(false);
@@ -80,6 +86,7 @@ pub fn setup_logger() {
                         tracing_subscriber::fmt::layer()
                             .event_format(tracing_subscriber::fmt::format().json())
                             .fmt_fields(JsonFields::new())
+                            .with_target(with_target)
                             .with_filter(build_env_filter()),
                     ))
                 }
@@ -91,7 +98,7 @@ pub fn setup_logger() {
                     Some(Box::new(
                         tracing_subscriber::fmt::layer()
                             .with_level(true)
-                            .with_target(false)
+                            .with_target(with_target)
                             .with_thread_ids(false)
                             .with_thread_names(false)
                             .with_file(false)
