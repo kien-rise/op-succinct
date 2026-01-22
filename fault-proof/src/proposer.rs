@@ -2219,7 +2219,6 @@ where
         Ok(tasks_spawned)
     }
 
-    #[tracing::instrument(name = "[[Precaching]]", skip(self))]
     async fn spawn_game_precaching_tasks(&self) -> Result<bool> {
         if self.count_active_defense_tasks().await > 0 {
             tracing::info!("Found defense tasks, skipping game precaching");
@@ -2378,6 +2377,28 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip(host), fields(game_address = ?game_address))]
+    async fn precache_game(
+        host: Arc<H>,
+        game_address: Address,
+        start_block: u64,
+        end_block: u64,
+        safe_db_fallback: bool,
+    ) -> Result<()> {
+        let start_time = std::time::Instant::now();
+        let cache_key = host.precache_witness(start_block, end_block, safe_db_fallback).await?;
+
+        tracing::info!(
+            game_address = ?game_address,
+            l2_block_start = start_block,
+            l2_block_end = end_block,
+            duration_s = start_time.elapsed().as_secs_f64(),
+            cache_key = ?cache_key,
+            "Game precached successfully"
+        );
+        Ok(())
+    }
+
     async fn spawn_game_precaching_task(&self, game_address: Address) -> Result<()> {
         let host = self.host.clone();
         let task_id = self.next_task_id.fetch_add(1, Ordering::Relaxed);
@@ -2398,20 +2419,13 @@ where
             end_block
         );
 
-        let handle = tokio::spawn(async move {
-            let start_time = std::time::Instant::now();
-            let cache_key = host.precache_witness(start_block, end_block, safe_db_fallback).await?;
-
-            tracing::info!(
-                game_address = ?game_address,
-                l2_block_start = start_block,
-                l2_block_end = end_block,
-                duration_s = start_time.elapsed().as_secs_f64(),
-                cache_key = ?cache_key,
-                "Game precached successfully"
-            );
-            Ok(())
-        });
+        let handle = tokio::spawn(Self::precache_game(
+            host,
+            game_address,
+            start_block,
+            end_block,
+            safe_db_fallback,
+        ));
 
         let task_info = TaskInfo::GamePrecaching { game_address };
         self.tasks.lock().await.insert(task_id, (handle, task_info));
