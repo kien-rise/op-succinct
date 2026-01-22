@@ -132,6 +132,7 @@ pub trait OPSuccinctHost: Send + Sync + 'static {
         anyhow::bail!("witness precaching not supported");
     }
 
+    #[tracing::instrument(name = "[[Precaching]]", skip(self))]
     async fn precache_witness(
         &self,
         _start_block: u64,

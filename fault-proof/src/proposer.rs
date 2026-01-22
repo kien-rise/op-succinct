@@ -2219,7 +2219,6 @@ where
         Ok(tasks_spawned)
     }
 
-    #[tracing::instrument(name = "[[Precaching]]", skip(self))]
     async fn spawn_game_precaching_tasks(&self) -> Result<bool> {
         if self.count_active_defense_tasks().await > 0 {
             tracing::info!("Found defense tasks, skipping game precaching");

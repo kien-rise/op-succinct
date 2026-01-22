@@ -188,7 +188,7 @@ impl OPSuccinctHost for EigenDAOPSuccinctHost {
 
             tracing::debug!("precache_witness: fetching host args");
             let host_args = host.fetch(start_block, end_block, None, safe_db_fallback).await?;
-            tracing::debug!("precache_witness: host args fetched successfully");
+            tracing::debug!(host_args = ?host_args, "precache_witness: host args fetched successfully");
 
             tracing::debug!("precache_witness: running witness generation");
             let mut witness = host.run(&host_args).await?;
