@@ -717,6 +717,7 @@ where
                     deadline: u64,
                     should_attempt_to_resolve: bool,
                     should_attempt_to_claim_bond: bool,
+                    is_precached: bool,
                 },
                 Remove(U256),
                 RemoveSubtree(U256),
@@ -727,6 +728,8 @@ where
             for (index, game_address) in games {
                 let contract =
                     OPSuccinctFaultDisputeGame::new(game_address, self.l1_provider.clone());
+                let l2_start_block = contract.startingBlockNumber().call().await?;
+                let l2_block = contract.l2BlockNumber().call().await?;
                 let claim_data = contract.claimData().call().await?;
                 let status = contract.status().call().await?;
                 let deadline = U256::from(claim_data.deadline).to::<u64>();
@@ -734,6 +737,8 @@ where
 
                 let is_finalized =
                     self.anchor_state_registry.isGameFinalized(game_address).call().await?;
+                let is_precached =
+                    self.host.is_witness_precached(l2_start_block.to(), l2_block.to()).await?;
 
                 match status {
                     GameStatus::IN_PROGRESS => {
@@ -778,6 +783,7 @@ where
                             deadline,
                             should_attempt_to_resolve,
                             should_attempt_to_claim_bond: false,
+                            is_precached,
                         });
                     }
                     GameStatus::DEFENDER_WINS => {
@@ -826,6 +832,7 @@ where
                                     deadline,
                                     should_attempt_to_resolve: false,
                                     should_attempt_to_claim_bond: false,
+                                    is_precached,
                                 });
                             }
                         } else {
@@ -836,6 +843,7 @@ where
                                 deadline,
                                 should_attempt_to_resolve: false,
                                 should_attempt_to_claim_bond: is_finalized && credit > U256::ZERO,
+                                is_precached,
                             });
                         }
                     }
@@ -856,6 +864,7 @@ where
                         deadline,
                         should_attempt_to_resolve,
                         should_attempt_to_claim_bond,
+                        is_precached,
                     } => {
                         if let Some(game) = state.games.get_mut(&index) {
                             game.status = status;
@@ -863,6 +872,7 @@ where
                             game.deadline = deadline;
                             game.should_attempt_to_resolve = should_attempt_to_resolve;
                             game.should_attempt_to_claim_bond = should_attempt_to_claim_bond;
+                            game.is_precached = is_precached;
                         }
                     }
                     GameSyncAction::Remove(index) => {
