@@ -58,6 +58,11 @@ pub enum ProposerGauge {
     )]
     GameCreationError,
     #[strum(
+        serialize = "op_succinct_fp_game_precaching_error",
+        message = "Total number of game precaching errors encountered by the proposer"
+    )]
+    GamePrecachingError,
+    #[strum(
         serialize = "op_succinct_fp_game_proving_error",
         message = "Total number of game proving errors encountered by the proposer"
     )]
