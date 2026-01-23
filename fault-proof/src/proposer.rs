@@ -2149,7 +2149,13 @@ where
         let next_l2_block_number_for_proposal = if self.config.proposal_interval_in_blocks > 0 {
             canonical_head_l2_block + U256::from(self.config.proposal_interval_in_blocks)
         } else {
-            self.get_next_l2_safe_block_number(canonical_head_l2_block).await?
+            match self.get_next_l2_safe_block_number(canonical_head_l2_block).await {
+                Ok(l2_safe_block_number) => l2_safe_block_number,
+                Err(err) => {
+                    tracing::debug!(err = %err, "Skipping game creation: failed to determine next L2 safe block for proposal");
+                    return Ok((false, U256::ZERO, u32::MAX));
+                }
+            }
         };
 
         Ok((
