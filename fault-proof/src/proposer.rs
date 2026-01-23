@@ -2246,11 +2246,6 @@ where
     }
 
     async fn spawn_game_precaching_tasks(&self) -> Result<bool> {
-        if self.count_active_defense_tasks().await > 0 {
-            tracing::info!("Found defense tasks, skipping game precaching");
-            return Ok(false);
-        }
-
         let mut candidates = (self.state.read().await.games)
             .values()
             .filter(|game| game.status == GameStatus::IN_PROGRESS)
