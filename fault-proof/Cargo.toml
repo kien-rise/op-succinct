@@ -19,6 +19,10 @@ path = "bin/proposer.rs"
 name = "challenger"
 path = "bin/challenger.rs"
 
+[[bin]]
+name = "monitor"
+path = "bin/monitor.rs"
+
 [dependencies]
 # local
 op-succinct-client-utils.workspace = true
