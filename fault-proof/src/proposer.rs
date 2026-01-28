@@ -12,8 +12,9 @@ use tempfile::NamedTempFile;
 
 use alloy_consensus::Header;
 use alloy_eips::BlockNumberOrTag;
-use alloy_primitives::{Address, Bytes, FixedBytes, TxHash, B256, U256};
+use alloy_primitives::{Address, BlockNumber, Bytes, FixedBytes, TxHash, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
+use alloy_rpc_client::RpcClient;
 use alloy_sol_types::{SolEvent, SolValue};
 use anyhow::{bail, Context, Result};
 use futures::stream::{self, StreamExt, TryStreamExt};
@@ -34,6 +35,7 @@ use tokio::{
     sync::{Mutex, RwLock, Semaphore},
     time,
 };
+use tracing::Instrument;
 
 use crate::{
     backup::ProposerBackup,
@@ -46,7 +48,7 @@ use crate::{
     is_parent_resolved,
     prometheus::ProposerGauge,
     prover::{MockProofProvider, NetworkProofProvider, ProofKeys, ProofProvider},
-    FactoryTrait, L1Provider, L2Provider, L2ProviderTrait, TxErrorExt, TX_REVERTED_PREFIX,
+    rise, FactoryTrait, L1Provider, L2Provider, L2ProviderTrait, TxErrorExt, TX_REVERTED_PREFIX,
 };
 
 /// Max allowed time (secs) between a game's deadline and the anchor game's deadline.
@@ -86,7 +88,7 @@ pub enum GameEventualValidityError {
 /// Information about a running task
 #[derive(Clone, Debug)]
 pub enum TaskInfo {
-    GameCreation { block_number: U256 },
+    GameCreation { l2_block_numbers: Vec<BlockNumber> },
     GamePrecaching { game_address: Address },
     GameProving { game_address: Address, is_defense: bool },
     GameResolution,
@@ -1774,7 +1776,9 @@ where
     /// Spawn pending operations if not already running
     async fn spawn_pending_operations(&self) -> Result<()> {
         // Check if we should create a game and spawn task if needed
-        if !self.has_active_task_of_type(&TaskInfo::GameCreation { block_number: U256::ZERO }).await
+        if !self
+            .has_active_task_of_type(&TaskInfo::GameCreation { l2_block_numbers: Vec::new() })
+            .await
         {
             match self.spawn_game_creation_task().await {
                 Ok(true) => tracing::info!("Successfully spawned game creation task"),
@@ -1918,20 +1922,63 @@ where
             .await
             .context("Pre-flight game implementation hash check failed")?;
 
-        // First check if we should create a game
-        let (should_create, next_l2_block_number_for_proposal, parent_game_index) =
-            self.should_create_game().await?;
-        if !should_create {
+        let starting_game_index: rise::GameIndex = {
+            let state = self.state.read().await;
+            if state.canonical_head_l2_block.is_none() {
+                tracing::info!("No canonical head; skipping game creation");
+                return Ok(false);
+            }
+            state.canonical_head_index.map(|index| index.to::<u32>()).unwrap_or(u32::MAX)
+        };
+
+        let max_games_to_create = std::env::var("MAX_GAMES_TO_CREATE")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(8);
+
+        let l1_rpc = self.fetcher.rpc_config.l1_rpc_client();
+        let l2_rpc = self.fetcher.rpc_config.l2_rpc_client();
+        let cl_rpc = RpcClient::new_http(self.fetcher.rpc_config.l2_node_rpc.clone());
+
+        let l2_block_numbers: Vec<BlockNumber> = rise::get_next_games_to_create(
+            &l1_rpc,
+            &l2_rpc,
+            &cl_rpc,
+            self.config.anchor_state_registry_address,
+            self.config.factory_address,
+            starting_game_index,
+            self.config.proposal_interval_in_blocks,
+            max_games_to_create,
+        )
+        .await?;
+
+        if l2_block_numbers.is_empty() {
             return Ok(false);
         }
 
         let proposer = self.clone();
         let task_id = self.next_task_id.fetch_add(1, Ordering::Relaxed);
+        let init_bond =
+            *self.init_bond.get().context("init_bond must be set via startup_validations")?;
+        let l2_block_numbers_cloned = l2_block_numbers.clone();
 
         let handle = tokio::spawn(async move {
-            if let Err(e) = proposer
-                .handle_game_creation(next_l2_block_number_for_proposal, parent_game_index)
-                .await
+            if let Err(e) = rise::create_games(
+                &l1_rpc,
+                &cl_rpc,
+                &proposer.signer,
+                proposer.config.factory_address,
+                proposer.config.game_type,
+                init_bond,
+                starting_game_index,
+                &l2_block_numbers,
+            )
+            .instrument(tracing::info_span!(
+                "[[Proposing]]",
+                starting_game_index,
+                ?l2_block_numbers
+            ))
+            .await
             {
                 tracing::warn!("Failed to handle game creation: {:?}", e);
                 return Err(e);
@@ -1941,13 +1988,14 @@ where
             Ok(())
         });
 
-        let task_info = TaskInfo::GameCreation { block_number: next_l2_block_number_for_proposal };
+        let task_info =
+            TaskInfo::GameCreation { l2_block_numbers: l2_block_numbers_cloned.clone() };
 
         self.tasks.lock().await.insert(task_id, (handle, task_info));
         tracing::info!(
-            "Spawned game creation task {} for block {}",
+            "Spawned game creation task {} for blocks {:?}",
             task_id,
-            next_l2_block_number_for_proposal
+            l2_block_numbers_cloned
         );
         Ok(true)
     }
@@ -2003,6 +2051,7 @@ where
     /// proposal, and the parent game index.
     /// If a game should not be created, dummy values are returned for the next L2 block number for
     /// proposal and parent game index.
+    #[allow(dead_code)]
     async fn should_create_game(&self) -> Result<(bool, U256, u32)> {
         // In fast finality mode, resume proving for existing games before creating new ones
         // TODO(fakedev9999): Consider unifying proving concurrency control for both fast finality

@@ -5,6 +5,7 @@ pub mod contract;
 pub mod prometheus;
 pub mod proposer;
 pub mod prover;
+pub mod rise;
 
 use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::{address, keccak256, Address, FixedBytes, B256, U256};

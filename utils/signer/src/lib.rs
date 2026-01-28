@@ -1,8 +1,8 @@
 use std::{str::FromStr, sync::Arc};
 
-use alloy_consensus::TxEnvelope;
+use alloy_consensus::{TxEnvelope, TypedTransaction};
 use alloy_eips::Decodable2718;
-use alloy_network::{Ethereum, EthereumWallet, TransactionBuilder};
+use alloy_network::{Ethereum, EthereumWallet, NetworkWallet, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxKind};
 use alloy_provider::{Provider, ProviderBuilder, Web3Signer};
 use alloy_rpc_client::RpcClient;
@@ -29,6 +29,57 @@ pub enum Signer {
     LocalSigner(PrivateKeySigner),
     /// Cloud HSM signer using Google.
     CloudHsmSigner(GcpSigner),
+}
+
+impl NetworkWallet<Ethereum> for Signer {
+    /// Get the default signer address.
+    fn default_signer_address(&self) -> Address {
+        self.address()
+    }
+
+    /// Return true if the signer contains a credential for the given address.
+    fn has_signer_for(&self, address: &Address) -> bool {
+        &self.address() == address
+    }
+
+    /// Return an iterator of all signer addresses.
+    fn signer_addresses(&self) -> impl Iterator<Item = Address> {
+        std::iter::once(self.address())
+    }
+
+    /// Asynchronously sign an unsigned transaction, with a specified credential.
+    async fn sign_transaction_from(
+        &self,
+        sender: Address,
+        tx: TypedTransaction,
+    ) -> alloy_signer::Result<TxEnvelope> {
+        if sender != self.address() {
+            return Err(alloy_signer::Error::other(format!(
+                "sender address mismatch: expected {}, got {}",
+                self.address(),
+                sender
+            )));
+        }
+
+        let tx_envelope: TxEnvelope = match self {
+            Signer::Web3Signer(url, address) => {
+                let provider = ProviderBuilder::new().connect_http(url.clone());
+                let signer = Web3Signer::new(provider, *address);
+                let transaction_request = tx.into();
+                signer.sign_and_decode(transaction_request).await?
+            }
+            Signer::LocalSigner(signer) => {
+                let wallet = EthereumWallet::new(signer.clone());
+                NetworkWallet::<Ethereum>::sign_transaction_from(&wallet, sender, tx).await?
+            }
+            Signer::CloudHsmSigner(signer) => {
+                let wallet = EthereumWallet::new(signer.clone());
+                NetworkWallet::<Ethereum>::sign_transaction_from(&wallet, sender, tx).await?
+            }
+        };
+
+        Ok(tx_envelope)
+    }
 }
 
 impl Signer {
@@ -228,6 +279,36 @@ impl SignerLock {
     ) -> Result<TransactionReceipt> {
         let signer = self.inner.lock().await;
         signer.send_transaction_request(l1_rpc_client, transaction_request).await
+    }
+}
+
+impl NetworkWallet<Ethereum> for SignerLock {
+    fn default_signer_address(&self) -> Address {
+        self.cached_address
+    }
+
+    fn has_signer_for(&self, address: &Address) -> bool {
+        &self.cached_address == address
+    }
+
+    fn signer_addresses(&self) -> impl Iterator<Item = Address> {
+        std::iter::once(self.cached_address)
+    }
+
+    /// Asynchronously sign an unsigned transaction, with a specified credential.
+    async fn sign_transaction_from(
+        &self,
+        sender: Address,
+        tx: TypedTransaction,
+    ) -> alloy_signer::Result<TxEnvelope> {
+        if sender != self.cached_address {
+            return Err(alloy_signer::Error::other(format!(
+                "sender address mismatch: expected {}, got {}",
+                self.cached_address, sender
+            )));
+        }
+
+        self.inner.lock().await.sign_transaction_from(sender, tx).await
     }
 }
 

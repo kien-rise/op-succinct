@@ -44,6 +44,7 @@ sol! {
     #[sol(rpc)]
     interface IDisputeGame {
         function status() external view returns (GameStatus status_);
+        function l2SequenceNumber() external pure returns (uint256 l2SequenceNumber_);
     }
 
     #[allow(missing_docs)]
