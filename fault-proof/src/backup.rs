@@ -134,11 +134,14 @@ mod tests {
             address: Address::ZERO,
             parent_index: 0,
             l2_block: U256::ZERO,
+            l2_start_block: U256::ZERO,
             status: GameStatus::IN_PROGRESS,
             proposal_status: ProposalStatus::Unchallenged,
             deadline: 0,
             should_attempt_to_resolve: false,
             should_attempt_to_claim_bond: false,
+            is_precached: false,
+            is_provable: false,
         };
 
         let json = serde_json::to_value(&game).unwrap();
