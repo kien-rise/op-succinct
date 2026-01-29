@@ -349,7 +349,7 @@ impl EigenDAOPSuccinctHost {
 
     fn get_cache_key(&self, start_block: u64, end_block: u64) -> B256 {
         let mut bytes = [0u8; 32];
-        bytes[0] = 0xc1;
+        bytes[0] = 0xc2;
         // TODO: include game hashes here
         bytes[16..24].copy_from_slice(&start_block.to_be_bytes());
         bytes[24..32].copy_from_slice(&end_block.to_be_bytes());
