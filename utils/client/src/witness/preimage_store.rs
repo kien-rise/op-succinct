@@ -1,4 +1,4 @@
-use alloy_primitives::keccak256;
+use alloy_primitives::{keccak256, Bytes};
 use async_trait::async_trait;
 use kona_preimage::{
     errors::{PreimageOracleError, PreimageOracleResult},
@@ -67,7 +67,7 @@ pub fn check_preimage(key: &PreimageKey, value: &[u8]) -> PreimageOracleResult<(
 
 #[async_trait]
 impl HintWriterClient for PreimageStore {
-    async fn write(&self, _hint: &str) -> PreimageOracleResult<()> {
+    async fn write(&self, _hint: &Bytes) -> PreimageOracleResult<()> {
         Ok(())
     }
 }

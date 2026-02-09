@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use alloy_primitives::Bytes;
 use async_trait::async_trait;
 use kona_preimage::{
     errors::{PreimageOracleError, PreimageOracleResult},
@@ -37,7 +38,7 @@ impl<P> HintWriterClient for PreimageWitnessCollector<P>
 where
     P: CommsClient + FlushableCache + Send + Sync + Clone,
 {
-    async fn write(&self, hint: &str) -> PreimageOracleResult<()> {
+    async fn write(&self, hint: &Bytes) -> PreimageOracleResult<()> {
         self.preimage_oracle.write(hint).await
     }
 }

@@ -18,7 +18,7 @@ use alloy_transport::layers::RetryBackoffLayer;
 use anyhow::{anyhow, bail, Context, Result};
 use futures::{stream, StreamExt};
 use kona_genesis::RollupConfig;
-use kona_host::single::SingleChainHost;
+use kona_host::single::{ExecutionWitnessEndpoint, SingleChainHost};
 use kona_protocol::L2BlockInfo;
 use kona_registry::L1_CONFIGS;
 use kona_rpc::{OutputResponse, SafeHeadResponse};
@@ -789,7 +789,9 @@ impl OPSuccinctDataFetcher {
             server: true,
             rollup_config_path: self.rollup_config_path.clone(),
             l1_config_path: self.l1_config_path.clone(),
-            enable_experimental_witness_endpoint: true,
+            enable_experimental_witness_endpoint: Some(
+                ExecutionWitnessEndpoint::DebugExecutionWitness,
+            ),
         })
     }
 }
