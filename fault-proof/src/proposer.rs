@@ -42,6 +42,7 @@ use crate::{
     config::ProposerConfig,
     contract::{
         AnchorStateRegistry::{self, AnchorStateRegistryInstance},
+        BondDistributionMode,
         DisputeGameFactory::{DisputeGameCreated, DisputeGameFactoryInstance},
         GameStatus, OPSuccinctFaultDisputeGame, ProposalStatus,
     },
@@ -789,9 +790,15 @@ where
                         });
                     }
                     GameStatus::DEFENDER_WINS => {
-                        let credit = contract.credit(signer_address).call().await?;
+                        // Credit is considered claimed when zero AND mode is determined.
+                        // When UNDECIDED, we must claim to trigger closeGame().
+                        let is_credit_claimed = match contract.bondDistributionMode().call().await?
+                        {
+                            BondDistributionMode::UNDECIDED => false,
+                            _ => contract.credit(signer_address).call().await? == U256::ZERO,
+                        };
 
-                        if is_finalized && credit == U256::ZERO {
+                        if is_finalized && is_credit_claimed {
                             // Game removal policy:
                             // - Canonical head games are retained even with zero credit to maintain
                             //   chain consistency.
@@ -844,7 +851,7 @@ where
                                 proposal_status: claim_data.status,
                                 deadline,
                                 should_attempt_to_resolve: false,
-                                should_attempt_to_claim_bond: is_finalized && credit > U256::ZERO,
+                                should_attempt_to_claim_bond: is_finalized && !is_credit_claimed,
                                 is_precached,
                             });
                         }
@@ -1359,11 +1366,20 @@ where
     }
 
     /// Submit the on-chain transaction to claim the proposer's bond for a given game.
+    /// If credit is zero, we call closeGame() instead.
     #[tracing::instrument(name = "[[Claiming Proposer Bonds]]", skip(self, game))]
     pub async fn submit_bond_claim_transaction(&self, game: &Game) -> Result<()> {
         let contract = OPSuccinctFaultDisputeGame::new(game.address, self.l1_provider.clone());
-        let transaction_request =
-            contract.claimCredit(self.signer.address()).gas(200_000).into_transaction_request();
+
+        // Check credit to determine whether to call closeGame() or claimCredit()
+        let credit = contract.credit(self.signer.address()).call().await?;
+
+        let transaction_request = if credit == U256::ZERO {
+            contract.closeGame().gas(200_000).into_transaction_request()
+        } else {
+            contract.claimCredit(self.signer.address()).gas(200_000).into_transaction_request()
+        };
+
         let receipt = self
             .signer
             .send_transaction_request(self.config.l1_rpc_client.clone(), transaction_request)
@@ -1378,6 +1394,7 @@ where
             game_address = ?game.address,
             l2_block_end = %game.l2_block,
             tx_hash = ?receipt.transaction_hash,
+            credit = %credit,
             "Bond claimed successfully"
         );
 

@@ -112,8 +112,14 @@ sol! {
         /// @notice Claim the credit belonging to the recipient address.
         function claimCredit(address _recipient) external;
 
+        /// @notice Closes out the game and determines the bond distribution mode.
+        function closeGame() external;
+
         /// @notice Returns the credit balance of a given recipient.
         function credit(address _recipient) external view returns (uint256 credit_);
+
+        /// @notice Returns the bond distribution mode of the game.
+        function bondDistributionMode() external view returns (BondDistributionMode bondDistributionMode_);
 
         /// @notice Getter for the rollup config hash.
         function rollupConfigHash() external view returns (bytes32 rollupConfigHash_);
@@ -184,6 +190,16 @@ sol! {
         ChallengedAndValidProofProvided,
         // The final state after resolution, either GameStatus.CHALLENGER_WINS or GameStatus.DEFENDER_WINS.
         Resolved
+    }
+
+    #[derive(Debug, PartialEq)]
+    enum BondDistributionMode {
+        // The bond distribution mode has not been determined yet.
+        UNDECIDED,
+        // Bonds should be refunded to their original depositors.
+        REFUND,
+        // Bonds should be distributed according to the game outcome.
+        NORMAL
     }
 
     #[derive(Debug)]
