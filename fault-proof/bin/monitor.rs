@@ -7,7 +7,7 @@ use alloy_transport_http::reqwest::Url;
 use anyhow::{bail, Result};
 use clap::Parser;
 use fault_proof::contract::{
-    ClaimData, DisputeGameFactory, GameStatus, OPSuccinctFaultDisputeGame,
+    BondDistributionMode, ClaimData, DisputeGameFactory, GameStatus, OPSuccinctFaultDisputeGame,
 };
 use op_succinct_host_utils::fetcher::get_rpc_client;
 use tracing_subscriber::EnvFilter;
@@ -19,6 +19,7 @@ const GAME_TYPE: u32 = 42;
 #[derive(Debug, Clone)]
 struct Game {
     // TODO: check the mutable fields
+    address: Address,
     starting_block_number: BlockNumber,
     l2_block_number: BlockNumber,
     root_claim: B256,
@@ -26,6 +27,7 @@ struct Game {
     status: GameStatus,
     claim_data: ClaimData,
     challenger_bond: U256,
+    bond_distribution_mode: BondDistributionMode,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -61,7 +63,8 @@ impl State {
             .add(contract.wasRespectedGameTypeWhenCreated())
             .add(contract.status())
             .add(contract.claimData())
-            .add(contract.challengerBond());
+            .add(contract.challengerBond())
+            .add(contract.bondDistributionMode());
 
         let (
             starting_block_number,
@@ -71,9 +74,11 @@ impl State {
             status,
             claim_data,
             challenger_bond,
+            bond_distribution_mode,
         ) = multicall.aggregate().await?;
 
         Ok(Game {
+            address: game_address,
             starting_block_number: starting_block_number.to(),
             l2_block_number: l2_block_number.to(),
             root_claim,
@@ -81,6 +86,7 @@ impl State {
             status,
             claim_data,
             challenger_bond,
+            bond_distribution_mode,
         })
     }
 
