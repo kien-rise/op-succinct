@@ -1,0 +1,41 @@
+[package]
+name = "rise-fp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+
+# alloy
+alloy-contract.workspace = true
+alloy-eips.workspace = true
+alloy-network.workspace = true
+alloy-primitives = { workspace = true, features = ["serde"] }
+alloy-provider = { workspace = true, features = ["reqwest"] }
+alloy-rpc-client.workspace = true
+alloy-rpc-types-eth.workspace = true
+alloy-rpc-types-trace.workspace = true
+alloy-sol-macro.workspace = true
+alloy-sol-types.workspace = true
+alloy-transport = { workspace = true, features = ["throttle"] }
+alloy-transport-http = { workspace = true, features = [
+    "reqwest",
+    "reqwest-native-tls",
+] }
+
+# op-alloy
+op-alloy-network.workspace = true
+op-alloy-rpc-types.workspace = true
+
+op-succinct-fp = { workspace = true, features = ["eigenda"] }
+
+anyhow.workspace = true
+clap = { workspace = true, features = ["derive"] }
+rand = { workspace = true, features = ["alloc"] }
+tokio-util = { workspace = true, features = ["rt"] }
+tokio.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tracing.workspace = true

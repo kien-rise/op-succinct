@@ -17,6 +17,7 @@ members = [
     "validity",
     "fault-proof",
     "bindings",
+    "rise-fp",
 ]
 resolver = "2"
 
@@ -29,6 +30,9 @@ repository = "https://github.com/succinctlabs/op-succinct"
 version = "4.2.0"
 
 [workspace.dependencies]
+tokio-util = { version = "0.7.18" }
+rand = "0.9"
+
 # general
 anyhow = { version = "1.0.86", default-features = false }
 thiserror = { version = "2.0.3" }
