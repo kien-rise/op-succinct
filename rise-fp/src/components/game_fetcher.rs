@@ -4,21 +4,30 @@ use alloy_primitives::{Address, U256};
 use alloy_provider::{layers::CallBatchLayer, Provider, ProviderBuilder};
 use alloy_rpc_client::RpcClient;
 use anyhow::Result;
-use fault_proof::contract::{DisputeGameFactory, OPSuccinctFaultDisputeGame};
+use fault_proof::contract::{AnchorStateRegistry, DisputeGameFactory, OPSuccinctFaultDisputeGame};
 use rand::seq::index::sample;
 use tokio::{sync::RwLock, task::JoinSet};
 use tokio_util::sync::CancellationToken;
 
 use crate::common::{
-    primitives::{GameIndex, GameSnapshot},
+    primitives::{parse_duration, AnchorRootSnapshot, GameIndex, GameSnapshot},
     state::State,
 };
 
 #[derive(Debug, clap::Args)]
 pub struct GameFetcherConfig {
-    #[arg(long = "fetcher.bounded-range", value_parser = GameFetcherConfig::__parse_range::<GameIndex>)]
-    bounded_range: Option<Range<GameIndex>>,
-    #[arg(long = "fetcher.poll-interval-seconds", value_parser = GameFetcherConfig::__parse_duration_secs, default_value = "1")]
+    #[arg(
+        long = "fetcher.bounded-range",
+        value_parser = GameFetcherConfig::__parse_range::<GameIndex>
+    )]
+    bounded_range: Option<Range<GameIndex>>, /* TODO: create a custom range type to support
+                                              * these: a..b, a.., ..b */
+    #[arg(
+        long = "fetcher.poll-interval",
+        value_parser = parse_duration,
+        default_value = "1",
+        help = "Polling interval. Examples: 2.5 (seconds), 1m, 500ms, 10s."
+    )]
     poll_interval: Duration,
     #[arg(long = "fetcher.batch-size", default_value = "1")]
     batch_size: NonZeroUsize,
@@ -31,40 +40,56 @@ impl GameFetcherConfig {
         let end = end.parse::<T>().map_err(|e| format!("invalid end value: {:?}", e))?;
         Ok(start..end)
     }
-
-    fn __parse_duration_secs(s: &str) -> Result<Duration, String> {
-        s.parse::<u64>().map(Duration::from_secs).map_err(|e| e.to_string())
-    }
 }
 
 pub struct GameFetcher {
-    config: GameFetcherConfig,
-    l1_rpc_client: RpcClient,
-    factory_address: Address,
     state: Arc<RwLock<State>>,
+    config: GameFetcherConfig,
+    l1_rpc: RpcClient,
+    factory_address: Address,
+    registry_address: Address,
 }
 
 impl GameFetcher {
     pub fn new(
+        state: Arc<RwLock<State>>,
         config: GameFetcherConfig,
         l1_rpc_client: RpcClient,
         factory_address: Address,
-        state: Arc<RwLock<State>>,
+        registry_address: Address,
     ) -> Self {
-        Self { config, l1_rpc_client, factory_address, state }
+        Self { state, config, l1_rpc: l1_rpc_client, factory_address, registry_address }
     }
 
     fn l1_provider(&self) -> impl Provider + Clone {
-        ProviderBuilder::new()
-            .layer(CallBatchLayer::new())
-            .connect_client(self.l1_rpc_client.clone())
+        ProviderBuilder::new().layer(CallBatchLayer::new()).connect_client(self.l1_rpc.clone())
     }
 
-    async fn fetch_game_count(&self) -> Result<u32> {
-        let factory = DisputeGameFactory::new(self.factory_address, self.l1_provider());
-        let game_count = factory.gameCount().call().await?.to::<u32>();
-        self.state.write().await.game_count = game_count;
-        Ok(game_count)
+    async fn fetch_metadata(&self) -> Result<(u32, AnchorRootSnapshot)> {
+        let l1_provider = self.l1_provider();
+        let factory_contract = DisputeGameFactory::new(self.factory_address, l1_provider.clone());
+        let registry_contract =
+            AnchorStateRegistry::new(self.registry_address, l1_provider.clone());
+        let (game_count, anchor_root, anchor_game) = l1_provider
+            .multicall()
+            .add(factory_contract.gameCount())
+            .add(registry_contract.getAnchorRoot())
+            .add(registry_contract.anchorGame())
+            .aggregate()
+            .await?;
+
+        let (game_count, anchor_root) = {
+            let mut state = self.state.write().await;
+            state.game_count = game_count.to();
+            state.anchor_root = AnchorRootSnapshot {
+                output_root: anchor_root._0,
+                claim_block: anchor_root._1.to(),
+                anchor_game,
+            };
+            (state.game_count, state.anchor_root.clone())
+        };
+
+        Ok((game_count, anchor_root))
     }
 
     fn __next_games_to_fetch(
@@ -119,29 +144,38 @@ impl GameFetcher {
     async fn __fetch_game(
         l1_provider: impl Provider + Clone,
         factory_address: Address,
+        registry_address: Address,
         game_index: GameIndex,
     ) -> Result<GameSnapshot> {
         let factory = DisputeGameFactory::new(factory_address, l1_provider.clone());
-        let game_address = { factory.gameAtIndex(U256::from(game_index)).call().await?.proxy };
+        let (game_address, created_at) = {
+            let ret = factory.gameAtIndex(U256::from(game_index)).call().await?;
+            (ret.proxy, ret.timestamp)
+        };
 
-        let game = OPSuccinctFaultDisputeGame::new(game_address, l1_provider.clone());
+        let game_contract = OPSuccinctFaultDisputeGame::new(game_address, l1_provider.clone());
+        let registry_contract = AnchorStateRegistry::new(registry_address, l1_provider.clone());
 
-        #[allow(non_snake_case)]
-        let (startingBlockNumber, l2BlockNumber, rootClaim, status) = l1_provider
+        let (output_root, claim_block, start_block, parent_index, game_status, is_blacklisted) = l1_provider
             .multicall()
-            .add(game.startingBlockNumber())
-            .add(game.l2BlockNumber())
-            .add(game.rootClaim())
-            .add(game.status())
+            .add(game_contract.rootClaim())
+            .add(game_contract.l2BlockNumber())
+            .add(game_contract.startingBlockNumber())
+            .add(game_contract.parentIndex())
+            .add(game_contract.status())
+            .add(registry_contract.isGameBlacklisted(game_address))
             .aggregate()
             .await?;
 
         let game_snapshot = GameSnapshot {
             proxy_address: game_address,
-            output_root: rootClaim,
-            claim_block: l2BlockNumber.to(),
-            start_block: startingBlockNumber.to(), // not in IDisputeGame
-            game_status: status,
+            output_root,
+            claim_block: claim_block.to(),
+            created_at,
+            start_block: start_block.to(), // not in IDisputeGame
+            parent_index, // not in IDisputeGame
+            game_status,
+            is_blacklisted,
         };
 
         Ok(game_snapshot)
@@ -165,9 +199,12 @@ impl GameFetcher {
         for game_index in next_games_to_fetch {
             let l1_provider = self.l1_provider();
             let factory_address = self.factory_address;
+            let registry_address = self.registry_address;
             let state = self.state.clone();
             set.spawn(async move {
-                match Self::__fetch_game(l1_provider, factory_address, game_index).await {
+                match Self::__fetch_game(l1_provider, factory_address, registry_address, game_index)
+                    .await
+                {
                     Ok(game_snapshot) => {
                         tracing::info!(game_index, ?game_snapshot, "Fetched game");
                         let changed = state.write().await.insert_game(game_index, game_snapshot);
@@ -197,10 +234,12 @@ impl GameFetcher {
             }
             has_made_progress = false;
 
-            match self.fetch_game_count().await {
-                Ok(game_count) => tracing::info!(%game_count, "Game count updated"),
+            match self.fetch_metadata().await {
+                Ok((game_count, anchor_root)) => {
+                    tracing::info!(%game_count, ?anchor_root, "Metadata updated")
+                }
                 Err(err) => {
-                    tracing::warn!(%err, "Failed to update");
+                    tracing::warn!(%err, "Failed to fetch metadata");
                     continue;
                 }
             };

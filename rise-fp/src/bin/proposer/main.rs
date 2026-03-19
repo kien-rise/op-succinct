@@ -23,6 +23,8 @@ struct Args {
     l1_max_rps: Option<u32>,
     #[arg(long)]
     factory_address: Address,
+    #[arg(long)]
+    registry_address: Address,
     #[command(flatten)]
     fetcher: GameFetcherConfig,
 }
@@ -47,8 +49,13 @@ async fn main() -> Result<()> {
 
     let ct = CancellationToken::new();
     let tracker = TaskTracker::new();
-    let game_fetcher =
-        GameFetcher::new(args.fetcher, l1_rpc_client, args.factory_address, state.clone());
+    let game_fetcher = GameFetcher::new(
+        state.clone(),
+        args.fetcher,
+        l1_rpc_client,
+        args.factory_address,
+        args.registry_address,
+    );
     tracker.spawn(game_fetcher.start(ct.clone()));
     tracker.close();
 

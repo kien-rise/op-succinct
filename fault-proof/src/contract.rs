@@ -67,6 +67,9 @@ sol! {
         /// @dev Alias for l2SequenceNumber() for backward compatibility.
         function l2BlockNumber() public pure returns (uint256 l2BlockNumber_);
 
+        /// @notice The parent index of the game.
+        function parentIndex() public pure returns (uint32 parentIndex_);
+
         /// @notice Only the starting block number of the game.
         function startingBlockNumber() external view returns (uint256 startingBlockNumber_);
 
@@ -139,6 +142,9 @@ sol! {
     contract AnchorStateRegistry {
         /// @notice Returns the current anchor root.
         function getAnchorRoot() public view returns (Hash, uint256);
+
+        /// @notice Determines whether a game is blacklisted.
+        function isGameBlacklisted(IDisputeGame _game) public view returns (bool);
 
         /// @notice Returns whether a game is finalized.
         function isGameFinalized(IDisputeGame _game) public view returns (bool);
