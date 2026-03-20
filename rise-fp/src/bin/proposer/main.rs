@@ -12,7 +12,10 @@ use tracing_subscriber::EnvFilter;
 
 use rise_fp::{
     common::state::State,
-    components::game_fetcher::{GameFetcher, GameFetcherConfig},
+    components::{
+        game_creator::{GameCreator, GameCreatorConfig},
+        game_fetcher::{GameFetcher, GameFetcherConfig, GameFetcherRequest},
+    },
 };
 
 #[derive(Debug, clap::Parser)]
@@ -26,7 +29,9 @@ struct Args {
     #[arg(long)]
     registry_address: Address,
     #[command(flatten)]
-    fetcher: GameFetcherConfig,
+    game_fetcher_config: GameFetcherConfig,
+    #[command(flatten)]
+    game_creator_config: GameCreatorConfig,
 }
 
 #[tokio::main]
@@ -40,7 +45,7 @@ async fn main() -> Result<()> {
         })
         .init();
 
-    let l1_rpc_client = match args.l1_max_rps {
+    let l1_rpc = match args.l1_max_rps {
         Some(rps) => ClientBuilder::default().layer(ThrottleLayer::new(rps)).http(args.l1_rpc),
         None => ClientBuilder::default().http(args.l1_rpc),
     };
@@ -49,14 +54,31 @@ async fn main() -> Result<()> {
 
     let ct = CancellationToken::new();
     let tracker = TaskTracker::new();
+
+    let game_fetcher_poll_interval = args.game_fetcher_config.poll_interval.clone();
     let game_fetcher = GameFetcher::new(
         state.clone(),
-        args.fetcher,
-        l1_rpc_client,
+        args.game_fetcher_config,
+        l1_rpc.clone(),
         args.factory_address,
         args.registry_address,
     );
-    tracker.spawn(game_fetcher.start(ct.clone()));
+
+    let game_creator = GameCreator::new(
+        state.clone(),
+        args.game_creator_config,
+        l1_rpc.clone(),
+        args.factory_address,
+    );
+
+    let (game_fetcher_tx, game_fetcher_rx) = GameFetcherRequest::channel();
+    tracker.spawn(game_fetcher.start_dispatcher(ct.clone(), game_fetcher_rx));
+    tracker.spawn(GameFetcher::start_driver(
+        ct.clone(),
+        game_fetcher_tx,
+        game_fetcher_poll_interval,
+    ));
+    tracker.spawn(game_creator.start(ct.clone()));
     tracker.close();
 
     signal::ctrl_c().await?;

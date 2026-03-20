@@ -6,7 +6,10 @@ use alloy_rpc_client::RpcClient;
 use anyhow::Result;
 use fault_proof::contract::{AnchorStateRegistry, DisputeGameFactory, OPSuccinctFaultDisputeGame};
 use rand::seq::index::sample;
-use tokio::{sync::RwLock, task::JoinSet};
+use tokio::{
+    sync::{mpsc, oneshot, RwLock},
+    task::JoinSet,
+};
 use tokio_util::sync::CancellationToken;
 
 use crate::common::{
@@ -20,7 +23,7 @@ pub struct GameFetcherConfig {
         long = "fetcher.bounded-range",
         value_parser = GameFetcherConfig::__parse_range::<GameIndex>
     )]
-    bounded_range: Option<Range<GameIndex>>, /* TODO: create a custom range type to support
+    pub bounded_range: Option<Range<GameIndex>>, /* TODO: create a custom range type to support
                                               * these: a..b, a.., ..b */
     #[arg(
         long = "fetcher.poll-interval",
@@ -28,9 +31,9 @@ pub struct GameFetcherConfig {
         default_value = "1",
         help = "Polling interval. Examples: 2.5 (seconds), 1m, 500ms, 10s."
     )]
-    poll_interval: Duration,
+    pub poll_interval: Duration,
     #[arg(long = "fetcher.batch-size", default_value = "1")]
-    batch_size: NonZeroUsize,
+    pub batch_size: NonZeroUsize,
 }
 
 impl GameFetcherConfig {
@@ -39,6 +42,19 @@ impl GameFetcherConfig {
         let start = start.parse::<T>().map_err(|e| format!("invalid start value: {:?}", e))?;
         let end = end.parse::<T>().map_err(|e| format!("invalid end value: {:?}", e))?;
         Ok(start..end)
+    }
+}
+
+#[derive(Debug)]
+pub enum GameFetcherRequest {
+    // request to sync, returns a bool indicating if any changes happens
+    Step(oneshot::Sender<bool>),
+    // more types will be added later
+}
+
+impl GameFetcherRequest {
+    pub fn channel() -> (mpsc::Sender<Self>, mpsc::Receiver<Self>) {
+        mpsc::channel(256)
     }
 }
 
@@ -226,39 +242,67 @@ impl GameFetcher {
         Ok(changed_games)
     }
 
-    pub async fn start(self, ct: CancellationToken) {
-        let mut has_made_progress = true;
+    async fn dispatch(&self, request: GameFetcherRequest) -> Result<()> {
+        match request {
+            GameFetcherRequest::Step(done) => {
+                let (game_count, anchor_root) = self.fetch_metadata().await?;
+                tracing::info!(%game_count, ?anchor_root, "Metadata updated");
+                let changed_games = self.fetch_new_games().await?;
+                tracing::info!(?changed_games, "Fetched games");
 
-        while !ct.is_cancelled() {
-            if !has_made_progress {
-                ct.run_until_cancelled(tokio::time::sleep(self.config.poll_interval)).await;
+                // returns whether progress has been made
+                if done.send(!changed_games.is_empty()).is_err() {
+                    tracing::error!("Receiver closed");
+                }
             }
-            has_made_progress = false;
+        }
+        Ok(())
+    }
 
-            match self.fetch_metadata().await {
-                Ok((game_count, anchor_root)) => {
-                    tracing::info!(%game_count, ?anchor_root, "Metadata updated")
-                }
-                Err(err) => {
-                    tracing::warn!(%err, "Failed to fetch metadata");
-                    continue;
-                }
+    pub async fn start_driver(
+        ct: CancellationToken,
+        tx: mpsc::Sender<GameFetcherRequest>,
+        poll_interval: Duration,
+    ) {
+        let mut immediate = true;
+
+        loop {
+            let delay = if immediate { Duration::ZERO } else { poll_interval };
+            if ct.run_until_cancelled(tokio::time::sleep(delay)).await.is_none() {
+                tracing::info!("Shutdown signal received, stopping");
+                break;
+            }
+
+            let (t, r) = oneshot::channel();
+            if tx.send(GameFetcherRequest::Step(t)).await.is_err() {
+                tracing::info!("Channel closed, stopping");
+                break;
             };
 
-            match self.fetch_new_games().await {
-                Ok(changed_games) => {
-                    if changed_games.is_empty() {
-                        tracing::info!("Tried fetching games but no changes found");
-                        continue;
-                    } else {
-                        tracing::info!(?changed_games, "Fetched games");
-                        has_made_progress = true;
-                        continue;
+            immediate = if let Ok(has_progress) = r.await { has_progress } else { false }
+        }
+    }
+
+    pub async fn start_dispatcher(
+        self,
+        ct: CancellationToken,
+        mut rx: mpsc::Receiver<GameFetcherRequest>,
+    ) {
+        loop {
+            match ct.run_until_cancelled(rx.recv()).await {
+                Some(Some(request)) => {
+                    tracing::debug!(?request, "Handling request");
+                    if let Err(err) = self.dispatch(request).await {
+                        tracing::error!(%err, "Failed to handle request");
                     }
                 }
-                Err(err) => {
-                    tracing::error!(%err, "Failed to fetch games");
-                    continue;
+                Some(None) => {
+                    tracing::info!("Channel closed, stopping");
+                    break;
+                }
+                None => {
+                    tracing::info!("Shutdown signal received, stopping");
+                    break;
                 }
             }
         }
