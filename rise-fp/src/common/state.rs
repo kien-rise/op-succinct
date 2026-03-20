@@ -87,12 +87,12 @@ impl State {
         //    - the anchor game if it exists, or
         //    - root games (no parent) matching the anchor claim block otherwise.
         let mut visited = BTreeMap::new();
-        for (game_index, game_snapshot) in self.games.range(possible_range) {
+        for (&game_index, game_snapshot) in self.games.range(possible_range) {
             if !game_snapshot.still_good(self.retirement_timestamp) {
                 continue;
             }
             let is_starting_point = match anchor_game_index {
-                Some(a) => game_index == &a,
+                Some(a) => game_index == a,
                 None => {
                     game_snapshot.parent_index == GameIndex::MAX &&
                         game_snapshot.start_block == self.anchor_root.claim_block
@@ -107,16 +107,11 @@ impl State {
         }
 
         // 4. From the visited set, select the game with the highest claim_block.
-        let mut highest_claim_block = self.anchor_root.claim_block;
-        let mut corresponding_game_index = GameIndex::MAX;
-
-        for (game_index, claim_block) in visited {
-            if claim_block > highest_claim_block {
-                highest_claim_block = claim_block;
-                corresponding_game_index = *game_index;
-            }
-        }
-
-        Some(corresponding_game_index)
+        let canonical_game_index = visited
+            .iter()
+            .max_by_key(|&(_, claim_block)| *claim_block)
+            .map(|(game_index, _)| *game_index)
+            .unwrap_or(GameIndex::MAX);
+        Some(canonical_game_index)
     }
 }

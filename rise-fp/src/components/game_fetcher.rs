@@ -156,16 +156,17 @@ impl GameFetcher {
         let game_contract = OPSuccinctFaultDisputeGame::new(game_address, l1_provider.clone());
         let registry_contract = AnchorStateRegistry::new(registry_address, l1_provider.clone());
 
-        let (output_root, claim_block, start_block, parent_index, game_status, is_blacklisted) = l1_provider
-            .multicall()
-            .add(game_contract.rootClaim())
-            .add(game_contract.l2BlockNumber())
-            .add(game_contract.startingBlockNumber())
-            .add(game_contract.parentIndex())
-            .add(game_contract.status())
-            .add(registry_contract.isGameBlacklisted(game_address))
-            .aggregate()
-            .await?;
+        let (output_root, claim_block, start_block, parent_index, game_status, is_blacklisted) =
+            l1_provider
+                .multicall()
+                .add(game_contract.rootClaim())
+                .add(game_contract.l2BlockNumber())
+                .add(game_contract.startingBlockNumber())
+                .add(game_contract.parentIndex())
+                .add(game_contract.status())
+                .add(registry_contract.isGameBlacklisted(game_address))
+                .aggregate()
+                .await?;
 
         let game_snapshot = GameSnapshot {
             proxy_address: game_address,
@@ -173,7 +174,7 @@ impl GameFetcher {
             claim_block: claim_block.to(),
             created_at,
             start_block: start_block.to(), // not in IDisputeGame
-            parent_index, // not in IDisputeGame
+            parent_index,                  // not in IDisputeGame
             game_status,
             is_blacklisted,
         };
