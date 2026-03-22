@@ -156,6 +156,7 @@ alloy-trie = { version = "0.9.1", default-features = false, features = [
     "ethereum",
 ] }
 alloy-eips = { version = "1.4", default-features = false }
+alloy-json-rpc = { version = "1.4", default-features = false }
 alloy-serde = { version = "1.4", default-features = false }
 alloy-consensus = { version = "1.4", default-features = false }
 alloy-tx-macros = { version = "1.4", default-features = false }

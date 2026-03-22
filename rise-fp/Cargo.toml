@@ -10,14 +10,18 @@ homepage.workspace = true
 [dependencies]
 
 # alloy
+alloy-consensus.workspace = true
 alloy-contract.workspace = true
 alloy-eips.workspace = true
+alloy-json-rpc.workspace = true
 alloy-network.workspace = true
 alloy-primitives = { workspace = true, features = ["serde"] }
 alloy-provider = { workspace = true, features = ["reqwest"] }
+alloy-rlp.workspace = true
 alloy-rpc-client.workspace = true
 alloy-rpc-types-eth.workspace = true
 alloy-rpc-types-trace.workspace = true
+alloy-signer-local.workspace = true
 alloy-sol-macro.workspace = true
 alloy-sol-types.workspace = true
 alloy-transport = { workspace = true, features = ["throttle"] }
@@ -34,7 +38,10 @@ op-succinct-fp = { workspace = true, features = ["eigenda"] }
 
 anyhow.workspace = true
 clap = { workspace = true, features = ["derive"] }
+futures.workspace = true
+kona-protocol.workspace = true
 rand = { workspace = true, features = ["alloc"] }
+serde.workspace = true
 thiserror.workspace = true
 tokio-util = { workspace = true, features = ["rt"] }
 tokio.workspace = true

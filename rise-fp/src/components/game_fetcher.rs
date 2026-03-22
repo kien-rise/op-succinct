@@ -7,7 +7,7 @@ use anyhow::Result;
 use fault_proof::contract::{AnchorStateRegistry, DisputeGameFactory, OPSuccinctFaultDisputeGame};
 use rand::seq::index::sample;
 use tokio::{
-    sync::{mpsc, oneshot, RwLock},
+    sync::{mpsc, oneshot, Notify, RwLock},
     task::JoinSet,
 };
 use tokio_util::sync::CancellationToken;
@@ -24,15 +24,21 @@ pub struct GameFetcherConfig {
         value_parser = GameFetcherConfig::__parse_range::<GameIndex>
     )]
     pub bounded_range: Option<Range<GameIndex>>, /* TODO: create a custom range type to support
-                                              * these: a..b, a.., ..b */
+                                                  * these: a..b, a.., ..b */
     #[arg(
+        id = "fetcher.poll-interval",
         long = "fetcher.poll-interval",
         value_parser = parse_duration,
         default_value = "1",
         help = "Polling interval. Examples: 2.5 (seconds), 1m, 500ms, 10s."
     )]
     pub poll_interval: Duration,
-    #[arg(long = "fetcher.batch-size", default_value = "1")]
+
+    #[arg(
+        id = "fetcher.batch-size",
+        long = "fetcher.batch-size",
+        default_value = "1"
+    )]
     pub batch_size: NonZeroUsize,
 }
 
@@ -64,6 +70,7 @@ pub struct GameFetcher {
     l1_rpc: RpcClient,
     factory_address: Address,
     registry_address: Address,
+    notification: Arc<Notify>,
 }
 
 impl GameFetcher {
@@ -73,8 +80,16 @@ impl GameFetcher {
         l1_rpc_client: RpcClient,
         factory_address: Address,
         registry_address: Address,
+        notification: Arc<Notify>,
     ) -> Self {
-        Self { state, config, l1_rpc: l1_rpc_client, factory_address, registry_address }
+        Self {
+            state,
+            config,
+            l1_rpc: l1_rpc_client,
+            factory_address,
+            registry_address,
+            notification,
+        }
     }
 
     fn l1_provider(&self) -> impl Provider + Clone {
@@ -249,11 +264,8 @@ impl GameFetcher {
                 tracing::info!(%game_count, ?anchor_root, "Metadata updated");
                 let changed_games = self.fetch_new_games().await?;
                 tracing::info!(?changed_games, "Fetched games");
-
-                // returns whether progress has been made
-                if done.send(!changed_games.is_empty()).is_err() {
-                    tracing::error!("Receiver closed");
-                }
+                let _ = done.send(!changed_games.is_empty()); // returns whether progress has been made
+                self.notification.notify_waiters();
             }
         }
         Ok(())
