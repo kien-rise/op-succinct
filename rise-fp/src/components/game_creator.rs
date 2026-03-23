@@ -11,21 +11,33 @@ use tokio::sync::{mpsc, oneshot, Notify, RwLock};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    common::{
-        cl_rpc_utils::{batch_call, OutputResponse, SafeDBClient},
-        el_rpc_utils::get_block_header,
-        primitives::GameIndex,
-        state::State,
-    },
+    common::{primitives::GameIndex, state::State},
     components::tx_manager::TxManagerRequest,
+    rpc::{
+        cl::{get_l1_origin, OutputResponse, SafeDBClient},
+        el::get_block_header,
+        utils::batch_call,
+    },
 };
 
 #[derive(Debug, clap::Args)]
 pub struct GameCreatorConfig {
     #[arg(id = "creator.game-type", long = "creator.game-type", default_value = "42")]
     pub game_type: u32,
-    #[arg(id = "creator.batch-size", long = "creator.batch-size", default_value = "1")]
-    pub batch_size: NonZeroUsize,
+
+    #[arg(
+        id = "creator.create-batch-size",
+        long = "creator.create-batch-size",
+        default_value = "4"
+    )]
+    pub create_batch_size: NonZeroUsize,
+
+    #[arg(
+        id = "creator.safedb-query-batch-size",
+        long = "creator.safedb-query-batch-size",
+        default_value = "64"
+    )]
+    pub safedb_query_batch_size: NonZeroUsize,
 }
 
 pub struct GameCreator {
@@ -134,15 +146,16 @@ impl GameCreator {
             get_block_header(&self.l1_rpc, BlockNumberOrTag::Finalized).await?.number;
         let l2_finalized =
             get_block_header(&self.l2_rpc, BlockNumberOrTag::Finalized).await?.number;
-        let mut safe_db_client = SafeDBClient::new(self.cl_rpc.clone(), 64); // TODO: avoid hard coding the batch size
-        let canonical_l1_origin = safe_db_client.l2_to_l1_origin(canonical_claim_block).await?;
+        let mut safe_db_client =
+            SafeDBClient::new(self.cl_rpc.clone(), self.config.safedb_query_batch_size.get());
+        let canonical_l1_origin = get_l1_origin(&self.cl_rpc, canonical_claim_block).await?;
         let l1_block_range = canonical_l1_origin.number..l1_finalized;
 
         let mut games = Vec::with_capacity(max_games_to_create);
         let mut current = canonical_claim_block + 1;
         while current <= l2_finalized && games.len() < max_games_to_create {
-            let l1_safe = safe_db_client.l2_to_l1_safe(current + 1, l1_block_range.clone()).await?;
-            let l2_safe = safe_db_client.l1_to_l2_safe(l1_safe, Some(current + 1)).await?;
+            let l1_safe = safe_db_client.l2_to_l1_safe(current, l1_block_range.clone()).await?;
+            let l2_safe = safe_db_client.l1_to_l2_safe(l1_safe, Some(current)).await?;
             games.push(l2_safe);
             current = l2_safe + 1;
         }
@@ -239,8 +252,9 @@ impl GameCreator {
         let Some((canonical_game_index, canonical_claim_block)) = canonical_head else {
             return Ok(())
         };
-        let next_claim_blocks =
-            self.next_games_to_create(canonical_claim_block, self.config.batch_size.get()).await?;
+        let next_claim_blocks = self
+            .next_games_to_create(canonical_claim_block, self.config.create_batch_size.get())
+            .await?;
 
         tracing::info!(%canonical_game_index, %canonical_claim_block, ?next_claim_blocks, "step");
 

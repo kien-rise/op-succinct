@@ -1,4 +1,4 @@
-use std::{fmt::Debug, num::NonZeroUsize, ops::Range, str::FromStr, sync::Arc, time::Duration};
+use std::{fmt::Debug, num::NonZeroUsize, ops::Range, sync::Arc, time::Duration};
 
 use alloy_primitives::{Address, U256};
 use alloy_provider::{layers::CallBatchLayer, Provider, ProviderBuilder};
@@ -13,18 +13,19 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 use crate::common::{
-    primitives::{parse_duration, AnchorRootSnapshot, GameIndex, GameSnapshot},
+    primitives::{parse_duration, parse_range, AnchorRootSnapshot, GameIndex, GameSnapshot},
     state::State,
 };
 
 #[derive(Debug, clap::Args)]
 pub struct GameFetcherConfig {
+    // TODO: create a custom range type to support these: a..b, a.., ..b
     #[arg(
         long = "fetcher.bounded-range",
-        value_parser = GameFetcherConfig::__parse_range::<GameIndex>
+        value_parser = parse_range::<GameIndex>
     )]
-    pub bounded_range: Option<Range<GameIndex>>, /* TODO: create a custom range type to support
-                                                  * these: a..b, a.., ..b */
+    pub bounded_range: Option<Range<GameIndex>>,
+
     #[arg(
         id = "fetcher.poll-interval",
         long = "fetcher.poll-interval",
@@ -34,21 +35,8 @@ pub struct GameFetcherConfig {
     )]
     pub poll_interval: Duration,
 
-    #[arg(
-        id = "fetcher.batch-size",
-        long = "fetcher.batch-size",
-        default_value = "1"
-    )]
+    #[arg(id = "fetcher.batch-size", long = "fetcher.batch-size", default_value = "16")]
     pub batch_size: NonZeroUsize,
-}
-
-impl GameFetcherConfig {
-    fn __parse_range<T: FromStr<Err: Debug>>(s: &str) -> Result<Range<T>, String> {
-        let (start, end) = s.split_once("..").ok_or_else(|| "missing ..".to_string())?;
-        let start = start.parse::<T>().map_err(|e| format!("invalid start value: {:?}", e))?;
-        let end = end.parse::<T>().map_err(|e| format!("invalid end value: {:?}", e))?;
-        Ok(start..end)
-    }
 }
 
 #[derive(Debug)]

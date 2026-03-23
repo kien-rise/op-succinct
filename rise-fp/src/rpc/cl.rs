@@ -1,13 +1,13 @@
-use std::{borrow::Cow, collections::BTreeMap, ops::Range};
+use std::{collections::BTreeMap, iter::zip, ops::Range};
 
 use alloy_eips::{BlockNumHash, BlockNumberOrTag};
-use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_primitives::{BlockNumber, B256};
 use alloy_rpc_client::RpcClient;
 use alloy_transport::TransportResult;
-use futures::future::try_join_all;
 use kona_protocol::{L2BlockInfo, SyncStatus};
 use serde::{Deserialize, Serialize};
+
+use crate::rpc::utils::batch_call;
 
 /// An [output response][or] for Optimism Rollup.
 ///
@@ -44,8 +44,11 @@ pub struct SafeHeadResponse {
 
 #[derive(Debug)]
 pub struct SafeDBClient {
+    // config (immutable)
     cl_rpc: RpcClient,
     batch_size: usize,
+
+    // state (mutable)
     cache: BTreeMap<BlockNumber, (BlockNumber, BlockNumber)>,
 }
 
@@ -81,23 +84,15 @@ impl SafeDBClient {
         &mut self,
         l1_block_numbers: Vec<BlockNumber>,
     ) -> TransportResult<()> {
-        let mut batch = self.cl_rpc.new_batch();
-        let mut futures = Vec::new();
+        let responses = batch_call(
+            &self.cl_rpc,
+            "optimism_safeHeadAtL1Block",
+            l1_block_numbers.iter().map(|bn| (BlockNumberOrTag::Number(*bn),)),
+            |resp: SafeHeadResponse| (resp.safe_head.number, resp.l1_block.number),
+        )
+        .await?;
 
-        for bn in l1_block_numbers.iter() {
-            futures.push(
-                batch
-                    .add_call::<_, SafeHeadResponse>(
-                        "optimism_safeHeadAtL1Block",
-                        &(BlockNumberOrTag::Number(*bn),),
-                    )?
-                    .map_resp(|resp| (resp.safe_head.number, (resp.l1_block.number, *bn))),
-            );
-        }
-        batch.send().await?;
-
-        let answers = try_join_all(futures).await?;
-        for (l2_safe, (l1_first, l1_last)) in answers {
+        for (l1_last, (l2_safe, l1_first)) in zip(l1_block_numbers, responses) {
             use std::collections::btree_map::Entry;
             match self.cache.entry(l2_safe) {
                 Entry::Vacant(vac) => {
@@ -152,19 +147,6 @@ impl SafeDBClient {
             self.query_l1_and_cache(l1_block_numbers).await?;
         }
     }
-
-    pub async fn l2_to_l1_origin(
-        &self,
-        l2_block_number: BlockNumber,
-    ) -> TransportResult<BlockNumHash> {
-        self.cl_rpc
-            .request::<_, OutputResponse>(
-                "optimism_outputAtBlock",
-                (BlockNumberOrTag::Number(l2_block_number),),
-            )
-            .map_resp(|resp| resp.block_ref.l1_origin)
-            .await
-    }
 }
 
 /// Distributes `sum` into a vector of `len` integers such that each element
@@ -190,31 +172,15 @@ fn bresenham(sum: u64, len: u64) -> Vec<u64> {
     terms
 }
 
-pub async fn get_output_at_block(
+pub async fn get_l1_origin(
     cl_rpc: &RpcClient,
     l2_block_number: BlockNumber,
-) -> TransportResult<OutputResponse> {
+) -> TransportResult<BlockNumHash> {
     cl_rpc
         .request::<_, OutputResponse>(
             "optimism_outputAtBlock",
             (BlockNumberOrTag::Number(l2_block_number),),
         )
+        .map_resp(|resp| resp.block_ref.l1_origin)
         .await
-}
-
-pub async fn batch_call<Params: RpcSend, Resp: RpcRecv, NewOutput>(
-    rpc: &RpcClient,
-    method: impl Into<Cow<'static, str>>,
-    params: impl Iterator<Item = Params>,
-    map_resp: impl Fn(Resp) -> NewOutput,
-) -> TransportResult<Vec<NewOutput>>
-{
-    let mut batch = rpc.new_batch();
-    let mut futures = Vec::new();
-    let method = method.into();
-    for param in params {
-        futures.push(batch.add_call::<Params, Resp>(method.clone(), &param)?.map_resp(&map_resp));
-    }
-    batch.send().await?;
-    try_join_all(futures).await
 }

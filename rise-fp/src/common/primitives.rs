@@ -1,6 +1,8 @@
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     num::{ParseFloatError, ParseIntError},
+    ops::Range,
+    str::FromStr,
     time::Duration,
 };
 
@@ -90,4 +92,25 @@ pub fn parse_duration(s: &str) -> Result<Duration, ParseDurationError> {
     };
 
     Ok(duration)
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ParseRangeError<T: FromStr<Err: Debug + Display>> {
+    #[error("missing range separator '..'")]
+    MissingSeparator,
+
+    #[error("invalid start value: {0}")]
+    InvalidStart(T::Err),
+
+    #[error("invalid end value: {0}")]
+    InvalidEnd(T::Err),
+}
+
+pub fn parse_range<T: FromStr<Err: Debug + Display>>(
+    s: &str,
+) -> Result<Range<T>, ParseRangeError<T>> {
+    let (start_str, end_str) = s.split_once("..").ok_or(ParseRangeError::MissingSeparator)?;
+    let start = start_str.parse::<T>().map_err(ParseRangeError::InvalidStart)?;
+    let end = end_str.parse::<T>().map_err(ParseRangeError::InvalidEnd)?;
+    Ok(start..end)
 }
