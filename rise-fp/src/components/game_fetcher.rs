@@ -63,16 +63,16 @@ pub struct GameFetcher {
 
 impl GameFetcher {
     pub fn new(
-        state: Arc<RwLock<State>>,
         config: GameFetcherConfig,
+        state: Arc<RwLock<State>>,
         l1_rpc_client: RpcClient,
         factory_address: Address,
         registry_address: Address,
         notification: Arc<Notify>,
     ) -> Self {
         Self {
-            state,
             config,
+            state,
             l1_rpc: l1_rpc_client,
             factory_address,
             registry_address,
@@ -259,31 +259,7 @@ impl GameFetcher {
         Ok(())
     }
 
-    pub async fn start_driver(
-        ct: CancellationToken,
-        tx: mpsc::Sender<GameFetcherRequest>,
-        poll_interval: Duration,
-    ) {
-        let mut immediate = true;
-
-        loop {
-            let delay = if immediate { Duration::ZERO } else { poll_interval };
-            if ct.run_until_cancelled(tokio::time::sleep(delay)).await.is_none() {
-                tracing::info!("Shutdown signal received, stopping");
-                break;
-            }
-
-            let (t, r) = oneshot::channel();
-            if tx.send(GameFetcherRequest::Step(t)).await.is_err() {
-                tracing::info!("Channel closed, stopping");
-                break;
-            };
-
-            immediate = if let Ok(has_progress) = r.await { has_progress } else { false }
-        }
-    }
-
-    pub async fn start_dispatcher(
+    pub async fn start(
         self,
         ct: CancellationToken,
         mut rx: mpsc::Receiver<GameFetcherRequest>,
