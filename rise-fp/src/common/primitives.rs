@@ -7,6 +7,9 @@ use std::{
 };
 
 use alloy_primitives::{Address, BlockNumber, BlockTimestamp, B256};
+use alloy_rpc_client::{ClientBuilder, RpcClient};
+use alloy_transport::layers::ThrottleLayer;
+use alloy_transport_http::reqwest::Url;
 use fault_proof::contract::GameStatus;
 
 pub type GameIndex = u32;
@@ -114,3 +117,34 @@ pub fn parse_range<T: FromStr<Err: Debug + Display>>(
     let end = end_str.parse::<T>().map_err(ParseRangeError::InvalidEnd)?;
     Ok(start..end)
 }
+
+pub struct RpcArgs {
+    pub rpc_url: Url,
+    pub max_rps: Option<u32>,
+}
+
+impl From<RpcArgs> for RpcClient {
+    fn from(args: RpcArgs) -> Self {
+        match args.max_rps {
+            Some(rps) => ClientBuilder::default().layer(ThrottleLayer::new(rps)).http(args.rpc_url),
+            None => ClientBuilder::default().http(args.rpc_url),
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! derive_from {
+    ($from:ident, $to:ident, [$($field:ident),*]) => {
+        impl From<$from> for $to {
+            fn from(source: $from) -> Self {
+                Self {
+                    $(
+                        $field: source.$field,
+                    )*
+                }
+            }
+        }
+    };
+}
+
+pub use derive_from;

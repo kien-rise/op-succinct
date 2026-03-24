@@ -15,3 +15,7 @@ pub mod rpc {
     pub mod el;
     pub mod utils;
 }
+
+pub mod proof {
+    pub mod host;
+}

@@ -4,6 +4,7 @@ use alloy_eips::{BlockNumHash, BlockNumberOrTag};
 use alloy_primitives::{BlockNumber, B256};
 use alloy_rpc_client::RpcClient;
 use alloy_transport::TransportResult;
+use kona_genesis::RollupConfig;
 use kona_protocol::{L2BlockInfo, SyncStatus};
 use serde::{Deserialize, Serialize};
 
@@ -183,4 +184,15 @@ pub async fn get_l1_origin(
         )
         .map_resp(|resp| resp.block_ref.l1_origin)
         .await
+}
+
+pub async fn get_output_at_block(
+    cl_rpc: &RpcClient,
+    l2_block_number: BlockNumber,
+) -> TransportResult<OutputResponse> {
+    cl_rpc.request("optimism_outputAtBlock", (BlockNumberOrTag::Number(l2_block_number),)).await
+}
+
+pub async fn get_rollup_config(cl_rpc: &RpcClient) -> TransportResult<RollupConfig> {
+    cl_rpc.request_noparams("optimism_rollupConfig").await
 }

@@ -1,6 +1,6 @@
 use alloy_consensus::Header;
 use alloy_eips::BlockNumberOrTag;
-use alloy_primitives::Bytes;
+use alloy_primitives::{Bytes, ChainId, U64};
 use alloy_rlp::Decodable;
 use alloy_rpc_client::RpcClient;
 use alloy_rpc_types_eth::Block;
@@ -22,4 +22,8 @@ pub async fn get_block_header(
         Some(block) => Ok(block.into_consensus_header()),
         None => Err(RpcError::NullResp),
     }
+}
+
+pub async fn get_chain_id(el_rpc: &RpcClient) -> TransportResult<ChainId> {
+    el_rpc.request_noparams("eth_chainId").map_resp(|resp: U64| resp.to::<u64>()).await
 }
