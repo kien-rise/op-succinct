@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
+use alloy_rpc_client::RpcClient;
 use anyhow::Result;
 use async_trait::async_trait;
 use canoe_verifier_address_fetcher::CanoeVerifierAddressFetcherDeployedByEigenLabs;
@@ -54,7 +55,30 @@ static CANOE_VK: LazyLock<SP1VerifyingKey> = LazyLock::new(|| {
     .expect("Canoe VK setup thread panicked")
 });
 
-pub struct EigenDAWitnessGenerator {}
+pub struct EigenDAWitnessGenerator {
+    l1_rpc: RpcClient,
+    /// - `None`: disable witness
+    /// - `Some(true)`: generate mock witness
+    /// - `Some(false)`: generate real witness
+    mock_mode: Option<bool>,
+}
+
+impl EigenDAWitnessGenerator {
+    pub fn new(l1_rpc: RpcClient, mock_mode: Option<bool>) -> Self {
+        Self { l1_rpc, mock_mode }
+    }
+
+    pub fn legacy() -> Self {
+        let eth_rpc_url = std::env::var("L1_RPC").expect("L1_RPC environment variable not set");
+        let mock_mode = env::var("OP_SUCCINCT_MOCK")
+            .unwrap_or("false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
+        let eth_rpc_client =
+            RpcClient::new_http(eth_rpc_url.parse().expect("Failed to parse L1_RPC as URL"));
+        Self::new(eth_rpc_client, Some(mock_mode))
+    }
+}
 
 #[async_trait]
 impl WitnessGenerator for EigenDAWitnessGenerator {
@@ -142,29 +166,33 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
         let kzg_proofs = create_kzg_proofs_for_eigenda_preimage(&eigenda_preimage_data);
 
         // Generate canoe proofs using the reduced proof provider for proof aggregation
-        use alloy_rpc_client::RpcClient;
         use canoe_sp1_cc_host::CanoeSp1CCReducedProofProvider;
-        let eth_rpc_url = std::env::var("L1_RPC")
-            .map_err(|_| anyhow::anyhow!("L1_RPC environment variable not set"))?;
-        let mock_mode = env::var("OP_SUCCINCT_MOCK")
-            .unwrap_or("false".to_string())
-            .parse::<bool>()
-            .unwrap_or(false);
-        let eth_rpc_client = RpcClient::new_http(
-            eth_rpc_url.parse().map_err(|_| anyhow::anyhow!("Failed to parse L1_RPC as URL"))?,
-        );
-        let canoe_provider = CanoeSp1CCReducedProofProvider { eth_rpc_client, mock_mode };
-        let maybe_canoe_proof = hokulea_witgen::from_boot_info_to_canoe_proof(
-            &boot_info,
-            &eigenda_preimage_data,
-            oracle.as_ref(),
-            canoe_provider,
-            CanoeVerifierAddressFetcherDeployedByEigenLabs {},
-        )
-        .await?;
 
-        let maybe_canoe_proof_bytes =
-            maybe_canoe_proof.map(|proof| serde_cbor::to_vec(&proof).expect("serde error"));
+        let maybe_canoe_proof = match self.mock_mode {
+            None => None,
+            Some(mock_mode) => {
+                let canoe_provider = CanoeSp1CCReducedProofProvider {
+                    eth_rpc_client: self.l1_rpc.clone(),
+                    mock_mode,
+                };
+                hokulea_witgen::from_boot_info_to_canoe_proof(
+                    &boot_info,
+                    &eigenda_preimage_data,
+                    oracle.as_ref(),
+                    canoe_provider,
+                    CanoeVerifierAddressFetcherDeployedByEigenLabs {},
+                )
+                .await?
+            }
+        };
+
+        let maybe_canoe_proof_bytes = if let Some(proof) = maybe_canoe_proof {
+            Some(serde_cbor::to_vec(&proof)?)
+        } else if self.mock_mode == None {
+            Some(vec![])
+        } else {
+            None
+        };
 
         let eigenda_witness = EigenDAWitness::from_preimage(
             eigenda_preimage_data,

@@ -194,8 +194,8 @@ async fn main() -> Result<()> {
             let server_task = tokio::task::spawn(preimage_server.start());
 
             use op_succinct_host_utils::witness_generation::traits::WitnessGenerator;
-            let witness_task = tokio::task::spawn(async {
-                let witness_generator = EigenDAWitnessGenerator {}; // TODO: replace it by a configurable struct
+            let witness_generator = EigenDAWitnessGenerator::new(l1_rpc.clone(), None);
+            let witness_task = tokio::task::spawn(async move {
                 witness_generator.run(preimage.client, hint.client).await
             });
 
