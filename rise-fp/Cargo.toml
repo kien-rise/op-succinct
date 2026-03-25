@@ -43,10 +43,15 @@ kona-providers-alloy.workspace = true
 kona-registry.workspace = true
 
 # hokulea
+canoe-provider.workspace = true
+canoe-sp1-cc-host.workspace = true
+canoe-verifier-address-fetcher.workspace = true
 hokulea-host-bin.workspace = true
 hokulea-proof.workspace = true
+hokulea-witgen.workspace = true
 
 # op-succinct
+op-succinct-client-utils.workspace = true
 op-succinct-eigenda-host-utils.workspace = true
 op-succinct-fp = { workspace = true, features = ["eigenda"] }
 op-succinct-host-utils.workspace = true
@@ -59,6 +64,7 @@ kona-protocol.workspace = true
 rand = { workspace = true, features = ["alloc"] }
 serde_json.workspace = true
 serde.workspace = true
+sp1-sdk.workspace = true
 thiserror.workspace = true
 tokio-util = { workspace = true, features = ["rt"] }
 tokio.workspace = true

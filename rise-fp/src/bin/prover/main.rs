@@ -6,27 +6,26 @@ use alloy_provider::RootProvider;
 use alloy_rpc_client::RpcClient;
 use alloy_transport_http::reqwest::Url;
 use anyhow::{bail, Result};
+use canoe_sp1_cc_host::canoe_proof_stdin;
 use clap::{Parser, Subcommand};
 use hokulea_host_bin::{
     cfg::SingleChainProvidersWithEigenDA, eigenda_preimage::OnlineEigenDAPreimageProvider,
 };
 use hokulea_proof::hint::ExtendedHintType;
 use kona_host::{
-    single::SingleChainProviders, MemoryKeyValueStore, OnlineHostBackend, PreimageServer,
-    SplitKeyValueStore,
+    single::SingleChainProviders, MemoryKeyValueStore, OnlineHostBackend, SplitKeyValueStore,
 };
-use kona_preimage::{BidirectionalChannel, HintReader, OracleServer};
 use kona_proof::HintType;
 use kona_providers_alloy::{OnlineBeaconClient, OnlineBlobProvider};
-use op_succinct_eigenda_host_utils::witness_generator::EigenDAWitnessGenerator;
 use rise_fp::{
     common::primitives::{derive_from, RpcArgs},
-    proof::host::{RiseCfg, RiseHintHandler},
+    proof::host::{PartialEigenDAWitnessData, RiseCfg, RiseHintHandler},
     rpc::{
         cl::{self, SafeDBClient},
         el,
     },
 };
+use sp1_sdk::SP1Stdin;
 use tokio::sync::RwLock;
 use tracing_subscriber::EnvFilter;
 
@@ -139,10 +138,6 @@ async fn main() -> Result<()> {
                 None => bail!("cannot find l1_config"),
             };
 
-            // Create channels
-            let preimage = BidirectionalChannel::new()?;
-            let hint = BidirectionalChannel::new()?;
-
             // Create backend
             let backend = {
                 let cfg = RiseCfg {
@@ -179,31 +174,21 @@ async fn main() -> Result<()> {
                     }
                 };
 
-                let hint_handler = RiseHintHandler {};
-
-                OnlineHostBackend::new(cfg, kv, providers, hint_handler)
+                OnlineHostBackend::new(cfg, kv, providers, RiseHintHandler)
                     .with_proactive_hint(ExtendedHintType::Original(HintType::L2PayloadWitness))
             };
 
-            let preimage_server = PreimageServer::new(
-                OracleServer::new(preimage.host),
-                HintReader::new(hint.host),
-                Arc::new(backend),
-            );
+            let partial_witness = PartialEigenDAWitnessData::build(backend, l1_rpc.clone()).await?;
 
-            let server_task = tokio::task::spawn(preimage_server.start());
+            let canoe_inputs = partial_witness.get_canoe_inputs().await?;
 
-            use op_succinct_host_utils::witness_generation::traits::WitnessGenerator;
-            let witness_generator = EigenDAWitnessGenerator::new(l1_rpc.clone(), None);
-            let witness_task = tokio::task::spawn(async move {
-                witness_generator.run(preimage.client, hint.client).await
-            });
+            let canoe_proof_stdin = if canoe_inputs.is_empty() {
+                SP1Stdin::new()
+            } else {
+                canoe_proof_stdin(&canoe_inputs, l1_rpc.clone()).await?
+            };
 
-            let witness = witness_task.await??;
-
-            tracing::debug!(?witness, "witness");
-
-            server_task.abort();
+            tracing::info!("partial_witness built");
         }
     }
     Ok(())
