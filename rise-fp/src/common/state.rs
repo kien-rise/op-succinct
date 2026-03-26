@@ -1,8 +1,11 @@
 use std::{collections::BTreeMap, fmt::Debug, ops::Range};
 
-use alloy_primitives::BlockTimestamp;
+use alloy_primitives::{BlockNumber, BlockTimestamp, B256};
 
-use crate::common::primitives::{AnchorRootSnapshot, GameIndex, GameSnapshot};
+use crate::common::{
+    contract::GameStatus,
+    primitives::{AnchorRootSnapshot, GameIndex, GameSnapshot},
+};
 
 #[derive(Debug, Default)]
 pub struct State {
@@ -11,6 +14,7 @@ pub struct State {
     pub fetched_range: Range<GameIndex>,
     pub anchor_root: AnchorRootSnapshot,
     pub retirement_timestamp: BlockTimestamp,
+    pub correct_output_roots: BTreeMap<BlockNumber, B256>,
 }
 
 impl State {
@@ -46,4 +50,28 @@ impl State {
         true
     }
 
+    // Check if challenging this game will surely win us the bond.
+    // See contracts/src/fp/OPSuccinctFaultDisputeGame.sol#resolve()
+    pub fn should_challenge_game(&self, game_index: GameIndex, now: BlockTimestamp) -> bool {
+        let Some(game) = self.games.get(&game_index) else {
+            return false;
+        };
+        if !game.can_challenge(now) {
+            return false;
+        }
+        if !game.still_good(self.retirement_timestamp) {
+            return false;
+        }
+        if let Some(parent) = self.games.get(&game.parent_index) {
+            if parent.game_status == GameStatus::CHALLENGER_WINS {
+                return true;
+            }
+        }
+        if let Some(r) = self.correct_output_roots.get(&game.claim_block) {
+            if r != &game.output_root {
+                return true;
+            }
+        }
+        false
+    }
 }

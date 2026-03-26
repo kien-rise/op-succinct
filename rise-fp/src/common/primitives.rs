@@ -11,7 +11,7 @@ use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_transport::layers::ThrottleLayer;
 use alloy_transport_http::reqwest::Url;
 
-use crate::common::contract::GameStatus;
+use crate::common::contract::{ClaimData, GameStatus, ProposalStatus};
 
 pub type GameIndex = u32;
 
@@ -48,17 +48,25 @@ impl RangeBounds<GameIndex> for GameRangeInclusive {
 
 #[derive(Debug, PartialEq)]
 pub struct GameSnapshot {
-    pub proxy_address: Address,
+    pub game_type: u32,
+    pub created_at: BlockTimestamp,
+    pub game_address: Address,
+
+    // IDisputeGame
     pub output_root: B256,
     pub claim_block: BlockNumber,
-    pub created_at: BlockTimestamp,
-    pub start_block: BlockNumber, // specific
-    pub parent_index: GameIndex,  // specific
-    pub game_status: GameStatus,  // mutable
-    pub is_blacklisted: bool,     // mutable
+    pub game_status: GameStatus, // mutable
+    pub is_blacklisted: bool,    // mutable
+
+    // OPSuccinctFaultDisputeGame
+    pub start_block: BlockNumber,
+    pub parent_index: GameIndex,
+    pub claim_data: ClaimData, // mutable
 }
 
 impl GameSnapshot {
+    // A game is considered "still good" if there exists a possibility that
+    // `isGameClaimValid(game)` returns true.
     pub fn still_good(&self, retirement_timestamp: BlockTimestamp) -> bool {
         // TODO: isGameRegistered(game)
         // TODO: isGameRespected(game)
@@ -76,6 +84,27 @@ impl GameSnapshot {
 
     pub fn is_retired(&self, retirement_timestamp: BlockTimestamp) -> bool {
         self.created_at <= retirement_timestamp
+    }
+
+    // See contracts/src/fp/OPSuccinctFaultDisputeGame.sol#gameOver()
+    pub fn is_over(&self, now: BlockTimestamp) -> bool {
+        self.claim_data.deadline < now || self.claim_data.prover != Address::ZERO
+    }
+
+    // Check whether calling the challenge() function would succeed.
+    // Just because "we can" does not mean "we should".
+    // See contracts/src/fp/OPSuccinctFaultDisputeGame.sol#challenge()
+    pub fn can_challenge(&self, now: BlockTimestamp) -> bool {
+        if self.game_status != GameStatus::IN_PROGRESS {
+            return false;
+        }
+        if self.claim_data.status != ProposalStatus::Unchallenged {
+            return false;
+        }
+        if self.is_over(now) {
+            return false;
+        }
+        true
     }
 }
 

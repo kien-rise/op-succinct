@@ -6,6 +6,7 @@ pub mod common {
 }
 
 pub mod components {
+    pub mod game_challenger;
     pub mod game_creator;
     pub mod game_fetcher;
     pub mod tx_manager;

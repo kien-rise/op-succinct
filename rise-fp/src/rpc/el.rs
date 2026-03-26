@@ -1,13 +1,17 @@
 use alloy_consensus::Header;
 use alloy_eips::BlockNumberOrTag;
-use alloy_primitives::{Address, Bytes, ChainId, U64};
+use alloy_primitives::{Address, BlockNumber, Bytes, ChainId, U64};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rlp::Decodable;
 use alloy_rpc_client::RpcClient;
 use alloy_rpc_types_eth::Block;
 use alloy_transport::{RpcError, TransportResult};
+use futures::future::try_join_all;
 
-use crate::common::contract::{OptimismPortal, SystemConfig};
+use crate::{
+    common::contract::{OptimismPortal, SystemConfig},
+    rpc::utils::batch_call,
+};
 
 pub async fn get_block_header(
     el_rpc: &RpcClient,
@@ -25,6 +29,34 @@ pub async fn get_block_header(
         Some(block) => Ok(block.into_consensus_header()),
         None => Err(RpcError::NullResp),
     }
+}
+
+pub async fn get_block_headers(
+    el_rpc: &RpcClient,
+    block_numbers: &[BlockNumber],
+) -> TransportResult<Vec<Header>> {
+    // 1. Try debug_getRawHeader batch first
+    if let Ok(raws) = batch_call(
+        el_rpc,
+        "debug_getRawHeader",
+        block_numbers.iter().map(|bn| (BlockNumberOrTag::Number(*bn),)),
+        |resp: Bytes| resp,
+    )
+    .await
+    {
+        if let Ok(headers) = raws
+            .into_iter()
+            .map(|raw| Header::decode(&mut raw.as_ref()))
+            .collect::<Result<Vec<_>, _>>()
+        {
+            return Ok(headers);
+        }
+    }
+
+    // 2. Fallback: Call get_block_header individually in parallel
+    let futures = (block_numbers.iter()) //
+        .map(|bn| get_block_header(el_rpc, BlockNumberOrTag::Number(*bn)));
+    try_join_all(futures).await
 }
 
 pub async fn get_chain_id(el_rpc: &RpcClient) -> TransportResult<ChainId> {

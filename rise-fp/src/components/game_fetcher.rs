@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     fmt::Debug,
     num::NonZeroUsize,
     ops::{Range, RangeBounds},
@@ -61,7 +62,7 @@ impl GameFetcherRequest {
 
 #[derive(Debug, Clone)]
 pub struct GameFetcherNotification {
-    pub changed_games: Vec<GameIndex>,
+    pub fetched_games: BTreeMap<GameIndex, bool>,
 }
 
 pub struct GameFetcher {
@@ -182,42 +183,60 @@ impl GameFetcher {
         registry_address: Address,
         game_index: GameIndex,
     ) -> Result<GameSnapshot> {
+        use alloy_provider::MulticallItem; // for .into_call()
+
         let factory = DisputeGameFactory::new(factory_address, l1_provider.clone());
-        let (game_address, created_at) = {
-            let ret = factory.gameAtIndex(U256::from(game_index)).call().await?;
-            (ret.proxy_, ret.timestamp_)
-        };
+        let (game_type, created_at, game_address) =
+            factory.gameAtIndex(U256::from(game_index)).call().await?.into();
 
         let game_contract = OPSuccinctFaultDisputeGame::new(game_address, l1_provider.clone());
         let registry_contract = AnchorStateRegistry::new(registry_address, l1_provider.clone());
 
-        let (output_root, claim_block, start_block, parent_index, game_status, is_blacklisted) =
-            l1_provider
-                .multicall()
-                .add(game_contract.rootClaim())
-                .add(game_contract.l2BlockNumber())
-                .add(game_contract.startingBlockNumber())
-                .add(game_contract.parentIndex())
-                .add(game_contract.status())
-                .add(registry_contract.isGameBlacklisted(game_address))
-                .aggregate()
-                .await?;
+        #[allow(non_snake_case)]
+        let (
+            rootClaim,
+            l2BlockNumber,
+            status,
+            isGameBlacklisted,
+            startingBlockNumber,
+            parentIndex,
+            claimData,
+        ) = l1_provider
+            .multicall()
+            .add(game_contract.rootClaim())
+            .add(game_contract.l2BlockNumber())
+            .add(game_contract.status())
+            .add(registry_contract.isGameBlacklisted(game_address))
+            .add_call(game_contract.startingBlockNumber().into_call(true))
+            .add_call(game_contract.parentIndex().into_call(true))
+            .add_call(game_contract.claimData().into_call(true))
+            .aggregate3()
+            .await?;
 
         let game_snapshot = GameSnapshot {
-            proxy_address: game_address,
-            output_root,
-            claim_block: claim_block.to(),
+            game_type,
             created_at,
-            start_block: start_block.to(), // not in IDisputeGame
-            parent_index,                  // not in IDisputeGame
-            game_status,
-            is_blacklisted,
+            game_address,
+
+            // IDisputeGame
+            output_root: rootClaim?,
+            claim_block: l2BlockNumber?.to(),
+            game_status: status?,
+            is_blacklisted: isGameBlacklisted?,
+
+            // OPSuccinctFaultDisputeGame only
+            // These calls may fail when the game type is not 42.
+            // We tolerate such errors by falling back to default values.
+            // If the game type isn't 42, these fields are irrelevant.
+            start_block: startingBlockNumber.unwrap_or_default().to(),
+            parent_index: parentIndex.unwrap_or_default(),
+            claim_data: claimData.unwrap_or_default(),
         };
 
         Ok(game_snapshot)
     }
 
-    async fn fetch_new_games(&self) -> Result<Vec<GameIndex>> {
+    async fn fetch_new_games(&self) -> Result<BTreeMap<GameIndex, bool>> {
         let (fetched_range, game_count) = {
             let state = self.state.read().await;
             (state.fetched_range.clone(), state.game_count)
@@ -244,7 +263,7 @@ impl GameFetcher {
                     Ok(game_snapshot) => {
                         tracing::info!(game_index, ?game_snapshot, "Fetched game");
                         let changed = state.write().await.insert_game(game_index, game_snapshot);
-                        changed.then_some(game_index)
+                        Some((game_index, changed))
                     }
                     Err(err) => {
                         tracing::warn!(game_index, ?err, "Fetch game failed");
@@ -254,11 +273,12 @@ impl GameFetcher {
             });
         }
 
-        let results = set.join_all().await;
-        let mut changed_games: Vec<_> = results.into_iter().flatten().collect();
-        changed_games.sort();
+        // TODO: also use eth_subscribe to watch for game events
 
-        Ok(changed_games)
+        let results = set.join_all().await;
+        let updated_games: BTreeMap<_, _> = results.into_iter().flatten().collect();
+
+        Ok(updated_games)
     }
 
     async fn dispatch(&self, request: GameFetcherRequest) -> Result<()> {
@@ -266,10 +286,11 @@ impl GameFetcher {
             GameFetcherRequest::Step(done) => {
                 let (game_count, anchor_root) = self.fetch_metadata().await?;
                 tracing::info!(%game_count, ?anchor_root, "Metadata updated");
-                let changed_games = self.fetch_new_games().await?;
-                tracing::info!(?changed_games, "Fetched games");
-                let _ = done.send(!changed_games.is_empty()); // returns whether progress has been made
-                let _ = self.broadcast_tx.send(GameFetcherNotification { changed_games });
+                let fetched_games = self.fetch_new_games().await?;
+                tracing::info!(?fetched_games, "Fetched games");
+                let has_progress = fetched_games.values().any(|changed| *changed);
+                let _ = done.send(has_progress);
+                let _ = self.broadcast_tx.send(GameFetcherNotification { fetched_games });
             }
         }
         Ok(())

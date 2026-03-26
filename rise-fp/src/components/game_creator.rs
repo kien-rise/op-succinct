@@ -82,7 +82,7 @@ impl GameCreator {
             if game_snapshot.is_retired(state.retirement_timestamp) {
                 return Some(game_index + 1..state.game_count); // latest retired game found
             }
-            if game_snapshot.proxy_address == state.anchor_root.anchor_game {
+            if game_snapshot.game_address == state.anchor_root.anchor_game {
                 return Some(game_index..state.game_count); // anchor game found
             }
         }
@@ -103,7 +103,7 @@ impl GameCreator {
         // 2. Locate the anchor game index within the fetched range.
         let anchor_game_index = (state.games.range(possible_range.clone()))
             .find(|(_, game_snapshot)| {
-                game_snapshot.proxy_address == state.anchor_root.anchor_game &&
+                game_snapshot.game_address == state.anchor_root.anchor_game &&
                     game_snapshot.still_good(state.retirement_timestamp)
             })
             .map(|(game_index, _)| *game_index);

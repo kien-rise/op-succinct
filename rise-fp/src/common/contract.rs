@@ -93,8 +93,9 @@ sol! {
         DEFENDER_WINS
     }
 
-    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
     enum ProposalStatus {
+        #[default]
         Unchallenged,
         Challenged,
         UnchallengedAndValidProofProvided,
@@ -103,7 +104,7 @@ sol! {
     }
 
     /// @notice The `ClaimData` struct represents the data associated with a Claim.
-    #[derive(Debug)]
+    #[derive(Debug, Default, PartialEq)]
     struct ClaimData {
         uint32 parentIndex;
         address counteredBy;
