@@ -14,7 +14,6 @@ use rise_fp::{
         state::State,
     },
     components::{
-        app_driver::{AppDriver, AppDriverConfig},
         game_creator::{GameCreator, GameCreatorConfig},
         game_fetcher::{GameFetcher, GameFetcherConfig, GameFetcherRequest},
         tx_manager::{TxManager, TxManagerConfig, TxManagerRequest},
@@ -30,8 +29,6 @@ struct Args {
     l2_rpc_args: L2RpcArgs,
     #[command(flatten)]
     cl_rpc_args: ClRpcArgs,
-    #[command(flatten)]
-    app_driver_config: AppDriverConfig,
     #[command(flatten)]
     game_fetcher_config: GameFetcherConfig,
     #[command(flatten)]
@@ -69,8 +66,6 @@ async fn main() -> Result<()> {
     tracing::info!(?factory_address, ?registry_address, "Fetched contract addresses");
 
     // Create components
-    let app_driver = AppDriver::new(args.app_driver_config, game_fetcher_tx);
-
     let game_fetcher = GameFetcher::new(
         args.game_fetcher_config,
         state.clone(),
@@ -96,7 +91,6 @@ async fn main() -> Result<()> {
     // Start all the components
     let ct = CancellationToken::new();
     let tracker = TaskTracker::new();
-    tracker.spawn(app_driver.start(ct.clone()));
     tracker.spawn(game_fetcher.start(ct.clone(), game_fetcher_rx));
     tracker.spawn(tx_manager.start(ct.clone(), tx_manager_rx));
     tracker.spawn(game_creator.start(ct.clone(), game_fetcher_broadcast_rx));
@@ -106,6 +100,7 @@ async fn main() -> Result<()> {
     signal::ctrl_c().await?;
     ct.cancel();
     tracker.wait().await;
+    drop(game_fetcher_tx); // we will use this later
 
     Ok(())
 }

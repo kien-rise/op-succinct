@@ -6,7 +6,6 @@ pub mod common {
 }
 
 pub mod components {
-    pub mod app_driver;
     pub mod game_creator;
     pub mod game_fetcher;
     pub mod tx_manager;

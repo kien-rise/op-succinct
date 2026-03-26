@@ -3,6 +3,7 @@ use std::{
     num::NonZeroUsize,
     ops::{Range, RangeBounds},
     sync::Arc,
+    time::Duration,
 };
 
 use alloy_primitives::{Address, U256};
@@ -13,12 +14,13 @@ use rand::seq::index::sample;
 use tokio::{
     sync::{broadcast, mpsc, oneshot, RwLock},
     task::JoinSet,
+    time::timeout,
 };
 use tokio_util::sync::CancellationToken;
 
 use crate::common::{
     contract::{AnchorStateRegistry, DisputeGameFactory, OPSuccinctFaultDisputeGame},
-    primitives::{AnchorRootSnapshot, GameIndex, GameRangeInclusive, GameSnapshot},
+    primitives::{parse_duration, AnchorRootSnapshot, GameIndex, GameRangeInclusive, GameSnapshot},
     state::State,
 };
 
@@ -29,6 +31,9 @@ pub struct GameFetcherConfig {
 
     #[arg(long = "fetcher.last-game-index")]
     pub last_game_index: Option<GameIndex>,
+
+    #[arg(long = "fetcher.poll-interval", value_parser = parse_duration, default_value = "60")]
+    pub poll_interval: Duration,
 
     #[arg(id = "fetcher.batch-size", long = "fetcher.batch-size", default_value = "16")]
     pub batch_size: NonZeroUsize,
@@ -271,21 +276,37 @@ impl GameFetcher {
     }
 
     pub async fn start(self, ct: CancellationToken, mut rx: mpsc::Receiver<GameFetcherRequest>) {
+        let mut immediate = true;
         loop {
-            match ct.run_until_cancelled(rx.recv()).await {
-                Some(Some(request)) => {
+            let delay = if immediate { Duration::ZERO } else { self.config.poll_interval };
+            immediate = false;
+
+            match ct.run_until_cancelled(timeout(delay, rx.recv())).await {
+                None => {
+                    tracing::info!("Shutdown signal received, stopping");
+                    break;
+                }
+                Some(Err(_elapsed)) => {
+                    tracing::debug!("Handling idle");
+                    let (done_tx, done_rx) = oneshot::channel();
+                    if let Err(err) = self.dispatch(GameFetcherRequest::Step(done_tx)).await {
+                        tracing::error!(%err, "Failed to handle request");
+                    }
+                    if let Ok(progress) = done_rx.await {
+                        if progress {
+                            immediate = true;
+                        }
+                    }
+                }
+                Some(Ok(None)) => {
+                    tracing::info!("Channel closed, stopping");
+                    break;
+                }
+                Some(Ok(Some(request))) => {
                     tracing::debug!(?request, "Handling request");
                     if let Err(err) = self.dispatch(request).await {
                         tracing::error!(%err, "Failed to handle request");
                     }
-                }
-                Some(None) => {
-                    tracing::info!("Channel closed, stopping");
-                    break;
-                }
-                None => {
-                    tracing::info!("Shutdown signal received, stopping");
-                    break;
                 }
             }
         }
