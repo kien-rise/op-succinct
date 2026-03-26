@@ -1,4 +1,6 @@
 pub mod common {
+    pub mod args;
+    pub mod contract;
     pub mod primitives;
     pub mod state;
 }

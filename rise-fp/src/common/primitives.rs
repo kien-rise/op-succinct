@@ -1,7 +1,7 @@
 use std::{
     fmt::{Debug, Display},
     num::{ParseFloatError, ParseIntError},
-    ops::Range,
+    ops::{Bound, Range, RangeBounds},
     str::FromStr,
     time::Duration,
 };
@@ -10,9 +10,41 @@ use alloy_primitives::{Address, BlockNumber, BlockTimestamp, B256};
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_transport::layers::ThrottleLayer;
 use alloy_transport_http::reqwest::Url;
-use fault_proof::contract::GameStatus;
+
+use crate::common::contract::GameStatus;
 
 pub type GameIndex = u32;
+
+pub struct GameRangeInclusive {
+    start: Option<GameIndex>,
+    end: Option<GameIndex>,
+}
+
+impl GameRangeInclusive {
+    pub fn new(start: Option<GameIndex>, end: Option<GameIndex>) -> Self {
+        Self { start, end }
+    }
+
+    pub fn clamp(&self, mut game_index: GameIndex) -> GameIndex {
+        if let Some(i) = self.end {
+            game_index = game_index.min(i)
+        }
+        if let Some(i) = self.start {
+            game_index = game_index.max(i);
+        }
+        game_index
+    }
+}
+
+impl RangeBounds<GameIndex> for GameRangeInclusive {
+    fn start_bound(&self) -> Bound<&GameIndex> {
+        self.start.as_ref().map_or(Bound::Unbounded, Bound::Included)
+    }
+
+    fn end_bound(&self) -> Bound<&GameIndex> {
+        self.end.as_ref().map_or(Bound::Unbounded, Bound::Included)
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct GameSnapshot {

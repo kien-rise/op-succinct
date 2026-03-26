@@ -1,42 +1,44 @@
-use std::{fmt::Debug, num::NonZeroUsize, ops::Range, sync::Arc, time::Duration};
+use std::{
+    fmt::Debug,
+    num::NonZeroUsize,
+    ops::{Range, RangeBounds},
+    sync::Arc,
+};
 
 use alloy_primitives::{Address, U256};
 use alloy_provider::{layers::CallBatchLayer, Provider, ProviderBuilder};
 use alloy_rpc_client::RpcClient;
 use anyhow::Result;
-use fault_proof::contract::{AnchorStateRegistry, DisputeGameFactory, OPSuccinctFaultDisputeGame};
 use rand::seq::index::sample;
 use tokio::{
-    sync::{mpsc, oneshot, Notify, RwLock},
+    sync::{broadcast, mpsc, oneshot, RwLock},
     task::JoinSet,
 };
 use tokio_util::sync::CancellationToken;
 
 use crate::common::{
-    primitives::{parse_duration, parse_range, AnchorRootSnapshot, GameIndex, GameSnapshot},
+    contract::{AnchorStateRegistry, DisputeGameFactory, OPSuccinctFaultDisputeGame},
+    primitives::{AnchorRootSnapshot, GameIndex, GameRangeInclusive, GameSnapshot},
     state::State,
 };
 
 #[derive(Debug, clap::Args)]
 pub struct GameFetcherConfig {
-    // TODO: create a custom range type to support these: a..b, a.., ..b
-    #[arg(
-        long = "fetcher.bounded-range",
-        value_parser = parse_range::<GameIndex>
-    )]
-    pub bounded_range: Option<Range<GameIndex>>,
+    #[arg(long = "fetcher.first-game-index")]
+    pub first_game_index: Option<GameIndex>,
 
-    #[arg(
-        id = "fetcher.poll-interval",
-        long = "fetcher.poll-interval",
-        value_parser = parse_duration,
-        default_value = "1",
-        help = "Polling interval. Examples: 2.5 (seconds), 1m, 500ms, 10s."
-    )]
-    pub poll_interval: Duration,
+    #[arg(long = "fetcher.last-game-index")]
+    pub last_game_index: Option<GameIndex>,
 
     #[arg(id = "fetcher.batch-size", long = "fetcher.batch-size", default_value = "16")]
     pub batch_size: NonZeroUsize,
+
+    #[arg(
+        id = "fetcher.broadcast-channel-capacity",
+        long = "fetcher.broadcast-channel-capacity",
+        default_value = "256"
+    )]
+    pub broadcast_channel_capacity: NonZeroUsize,
 }
 
 #[derive(Debug)]
@@ -52,13 +54,19 @@ impl GameFetcherRequest {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct GameFetcherNotification {
+    pub changed_games: Vec<GameIndex>,
+}
+
 pub struct GameFetcher {
     state: Arc<RwLock<State>>,
     config: GameFetcherConfig,
     l1_rpc: RpcClient,
     factory_address: Address,
     registry_address: Address,
-    notification: Arc<Notify>,
+
+    broadcast_tx: broadcast::Sender<GameFetcherNotification>,
 }
 
 impl GameFetcher {
@@ -68,16 +76,23 @@ impl GameFetcher {
         l1_rpc_client: RpcClient,
         factory_address: Address,
         registry_address: Address,
-        notification: Arc<Notify>,
     ) -> Self {
+        let (broadcast_tx, _broadcast_rx) =
+            broadcast::channel(config.broadcast_channel_capacity.get());
+
         Self {
             config,
             state,
             l1_rpc: l1_rpc_client,
             factory_address,
             registry_address,
-            notification,
+
+            broadcast_tx,
         }
+    }
+
+    pub fn subscribe(&self) -> broadcast::Receiver<GameFetcherNotification> {
+        self.broadcast_tx.subscribe()
     }
 
     fn l1_provider(&self) -> impl Provider + Clone {
@@ -114,24 +129,20 @@ impl GameFetcher {
     fn __next_games_to_fetch(
         game_count: u32,
         fetched_range: Range<GameIndex>,
-        bounded_range: Option<Range<GameIndex>>,
+        bounded_range: GameRangeInclusive,
         batch_size: usize,
     ) -> Vec<GameIndex> {
         let mut next_games = Vec::with_capacity(batch_size);
 
         let (start, end) = if !fetched_range.is_empty() {
             (fetched_range.start, fetched_range.end)
-        } else if let Some(range) = bounded_range.as_ref() {
-            let game_index = game_count.clamp(range.start, range.end);
-            (game_index, game_index)
         } else {
-            (game_count, game_count)
+            let game_index = bounded_range.clamp(game_count);
+            (game_index, game_index)
         };
 
         let mut try_push = |game_index| {
-            if next_games.len() < next_games.capacity() &&
-                bounded_range.as_ref().is_none_or(|r| r.contains(&game_index))
-            {
+            if next_games.len() < next_games.capacity() && bounded_range.contains(&game_index) {
                 next_games.push(game_index);
             }
         };
@@ -169,7 +180,7 @@ impl GameFetcher {
         let factory = DisputeGameFactory::new(factory_address, l1_provider.clone());
         let (game_address, created_at) = {
             let ret = factory.gameAtIndex(U256::from(game_index)).call().await?;
-            (ret.proxy, ret.timestamp)
+            (ret.proxy_, ret.timestamp_)
         };
 
         let game_contract = OPSuccinctFaultDisputeGame::new(game_address, l1_provider.clone());
@@ -210,7 +221,7 @@ impl GameFetcher {
         let next_games_to_fetch = Self::__next_games_to_fetch(
             game_count,
             fetched_range,
-            self.config.bounded_range.clone(),
+            GameRangeInclusive::new(self.config.first_game_index, self.config.last_game_index),
             self.config.batch_size.get(),
         );
 
@@ -253,17 +264,13 @@ impl GameFetcher {
                 let changed_games = self.fetch_new_games().await?;
                 tracing::info!(?changed_games, "Fetched games");
                 let _ = done.send(!changed_games.is_empty()); // returns whether progress has been made
-                self.notification.notify_waiters();
+                let _ = self.broadcast_tx.send(GameFetcherNotification { changed_games });
             }
         }
         Ok(())
     }
 
-    pub async fn start(
-        self,
-        ct: CancellationToken,
-        mut rx: mpsc::Receiver<GameFetcherRequest>,
-    ) {
+    pub async fn start(self, ct: CancellationToken, mut rx: mpsc::Receiver<GameFetcherRequest>) {
         loop {
             match ct.run_until_cancelled(rx.recv()).await {
                 Some(Some(request)) => {

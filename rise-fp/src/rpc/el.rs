@@ -1,10 +1,13 @@
 use alloy_consensus::Header;
 use alloy_eips::BlockNumberOrTag;
-use alloy_primitives::{Bytes, ChainId, U64};
+use alloy_primitives::{Address, Bytes, ChainId, U64};
+use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rlp::Decodable;
 use alloy_rpc_client::RpcClient;
 use alloy_rpc_types_eth::Block;
 use alloy_transport::{RpcError, TransportResult};
+
+use crate::common::contract::{OptimismPortal, SystemConfig};
 
 pub async fn get_block_header(
     el_rpc: &RpcClient,
@@ -26,4 +29,25 @@ pub async fn get_block_header(
 
 pub async fn get_chain_id(el_rpc: &RpcClient) -> TransportResult<ChainId> {
     el_rpc.request_noparams("eth_chainId").map_resp(|resp: U64| resp.to::<u64>()).await
+}
+
+pub async fn get_factory_and_registry_addresses(
+    l1_rpc: &RpcClient,
+    l1_system_config_address: Address,
+) -> TransportResult<(Address, Address)> {
+    let l1_provider = ProviderBuilder::new().connect_client(l1_rpc.clone());
+    let system_config = SystemConfig::new(l1_system_config_address, l1_provider.clone());
+    let optimism_portal = match system_config.optimismPortal().call().await {
+        Ok(address) => OptimismPortal::new(address, l1_provider.clone()),
+        Err(err) => return Err(RpcError::local_usage(err)),
+    };
+    let (factory, registry) = l1_provider
+        .multicall()
+        .add(optimism_portal.disputeGameFactory())
+        .add(optimism_portal.anchorStateRegistry())
+        .aggregate()
+        .await
+        .map_err(RpcError::local_usage)?;
+
+    Ok((factory, registry))
 }

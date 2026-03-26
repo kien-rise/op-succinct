@@ -53,7 +53,6 @@ hokulea-witgen.workspace = true
 # op-succinct
 op-succinct-client-utils.workspace = true
 op-succinct-eigenda-host-utils.workspace = true
-op-succinct-fp = { workspace = true, features = ["eigenda"] }
 op-succinct-host-utils.workspace = true
 
 anyhow.workspace = true

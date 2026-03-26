@@ -6,13 +6,16 @@ use alloy_provider::{layers::CallBatchLayer, Provider, ProviderBuilder};
 use alloy_rpc_client::RpcClient;
 use alloy_sol_types::{SolEvent, SolValue};
 use anyhow::{bail, Result};
-use fault_proof::contract::DisputeGameFactory::{self, DisputeGameCreated};
-use tokio::sync::{mpsc, oneshot, Notify, RwLock};
+use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    common::{primitives::GameIndex, state::State},
-    components::tx_manager::TxManagerRequest,
+    common::{
+        contract::DisputeGameFactory::{self, DisputeGameCreated},
+        primitives::GameIndex,
+        state::State,
+    },
+    components::{game_fetcher::GameFetcherNotification, tx_manager::TxManagerRequest},
     rpc::{
         cl::{get_l1_origin, OutputResponse, SafeDBClient},
         el::get_block_header,
@@ -192,7 +195,7 @@ impl GameCreator {
                 .aggregate()
                 .await?;
 
-            if !existing_game.proxy.is_zero() {
+            if !existing_game.proxy_.is_zero() {
                 tracing::warn!(?existing_game, %bn, %parent_game_index, "Skipping creating game");
                 continue;
             }
@@ -231,7 +234,7 @@ impl GameCreator {
                         .aggregate()
                         .await?;
                     zip(start..end, games)
-                        .find_map(|(i, g)| (g.proxy == game_address).then_some(i))
+                        .find_map(|(i, g)| (g.proxy_ == game_address).then_some(i))
                         .ok_or_else(|| anyhow::anyhow!("cannot find created game"))?
                 }
             };
@@ -265,8 +268,15 @@ impl GameCreator {
         Ok(())
     }
 
-    pub async fn start(self, ct: CancellationToken, game_fetcher_notification: Arc<Notify>) {
-        while ct.run_until_cancelled(game_fetcher_notification.notified()).await.is_some() {
+    pub async fn start(
+        self,
+        ct: CancellationToken,
+        mut game_fetcher_broadcast_rx: broadcast::Receiver<GameFetcherNotification>,
+    ) {
+        while let Some(notification_result) =
+            ct.run_until_cancelled(game_fetcher_broadcast_rx.recv()).await
+        {
+            tracing::debug!(?notification_result, "Receive GameFetcher notification");
             match self.step().await {
                 Ok(_) => {}
                 Err(err) => tracing::error!(%err, "Failed to step"),

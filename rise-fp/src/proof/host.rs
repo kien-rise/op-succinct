@@ -25,7 +25,6 @@ use op_succinct_client_utils::witness::{
 };
 use op_succinct_eigenda_host_utils::witness_generator::EigenDAWitnessGenerator;
 use op_succinct_host_utils::witness_generation::traits::WitnessGenerator;
-use sp1_sdk::{SP1Proof, SP1Stdin};
 
 // https://github.com/op-rs/kona/blob/bfcb26d8c76224a1a62f2ded67434ace9ed59a7e/bin/host/src/single/cfg.rs#L58
 pub struct RiseCfg {

@@ -1,46 +1,35 @@
 use std::{fmt::Debug, sync::Arc};
 
-use alloy_primitives::Address;
-use alloy_rpc_client::ClientBuilder;
-use alloy_transport::layers::ThrottleLayer;
-use alloy_transport_http::reqwest::Url;
+use alloy_rpc_client::RpcClient;
 use anyhow::Result;
 use clap::Parser;
-use tokio::{
-    signal,
-    sync::{Notify, RwLock},
-};
+use tokio::{signal, sync::RwLock};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing_subscriber::EnvFilter;
 
 use rise_fp::{
-    common::state::State,
+    common::{
+        args::{ClRpcArgs, L1RpcArgs, L2RpcArgs},
+        primitives::RpcArgs,
+        state::State,
+    },
     components::{
         app_driver::{AppDriver, AppDriverConfig},
         game_creator::{GameCreator, GameCreatorConfig},
         game_fetcher::{GameFetcher, GameFetcherConfig, GameFetcherRequest},
         tx_manager::{TxManager, TxManagerConfig, TxManagerRequest},
     },
+    rpc::{cl, el},
 };
 
 #[derive(Debug, clap::Parser)]
 struct Args {
-    #[arg(long)]
-    l1_rpc: Url,
-    #[arg(long)]
-    l1_max_rps: Option<u32>,
-    #[arg(long)]
-    l2_rpc: Url,
-    #[arg(long)]
-    l2_max_rps: Option<u32>,
-    #[arg(long)]
-    cl_rpc: Url,
-    #[arg(long)]
-    cl_max_rps: Option<u32>,
-    #[arg(long)]
-    factory_address: Address,
-    #[arg(long)]
-    registry_address: Address,
+    #[command(flatten)]
+    l1_rpc_args: L1RpcArgs,
+    #[command(flatten)]
+    l2_rpc_args: L2RpcArgs,
+    #[command(flatten)]
+    cl_rpc_args: ClRpcArgs,
     #[command(flatten)]
     app_driver_config: AppDriverConfig,
     #[command(flatten)]
@@ -63,26 +52,21 @@ async fn main() -> Result<()> {
         .init();
 
     // Create RPC clients
-    let l1_rpc = match args.l1_max_rps {
-        Some(rps) => ClientBuilder::default().layer(ThrottleLayer::new(rps)).http(args.l1_rpc),
-        None => ClientBuilder::default().http(args.l1_rpc),
-    };
-
-    let l2_rpc = match args.l2_max_rps {
-        Some(rps) => ClientBuilder::default().layer(ThrottleLayer::new(rps)).http(args.l2_rpc),
-        None => ClientBuilder::default().http(args.l2_rpc),
-    };
-
-    let cl_rpc = match args.cl_max_rps {
-        Some(rps) => ClientBuilder::default().layer(ThrottleLayer::new(rps)).http(args.cl_rpc),
-        None => ClientBuilder::default().http(args.cl_rpc),
-    };
+    let l1_rpc: RpcClient = RpcArgs::from(args.l1_rpc_args).into();
+    let l2_rpc: RpcClient = RpcArgs::from(args.l2_rpc_args).into();
+    let cl_rpc: RpcClient = RpcArgs::from(args.cl_rpc_args).into();
 
     // Create states, channels, notifications
     let state = Arc::new(RwLock::new(State::default()));
     let (game_fetcher_tx, game_fetcher_rx) = GameFetcherRequest::channel();
     let (tx_manager_tx, tx_manager_rx) = TxManagerRequest::channel();
-    let game_fetcher_notification = Arc::new(Notify::new());
+
+    // Fetch contract addresses
+    let rollup_config = cl::get_rollup_config(&cl_rpc).await?;
+    let (factory_address, registry_address) =
+        el::get_factory_and_registry_addresses(&l1_rpc, rollup_config.l1_system_config_address)
+            .await?;
+    tracing::info!(?factory_address, ?registry_address, "Fetched contract addresses");
 
     // Create components
     let app_driver = AppDriver::new(args.app_driver_config, game_fetcher_tx);
@@ -91,10 +75,11 @@ async fn main() -> Result<()> {
         args.game_fetcher_config,
         state.clone(),
         l1_rpc.clone(),
-        args.factory_address,
-        args.registry_address,
-        game_fetcher_notification.clone(),
+        factory_address,
+        registry_address,
     );
+
+    let game_fetcher_broadcast_rx = game_fetcher.subscribe();
 
     let tx_manager = TxManager::new(args.tx_manager_config, l1_rpc.clone());
 
@@ -104,7 +89,7 @@ async fn main() -> Result<()> {
         l1_rpc.clone(),
         l2_rpc.clone(),
         cl_rpc.clone(),
-        args.factory_address,
+        factory_address,
         tx_manager_tx,
     );
 
@@ -114,7 +99,7 @@ async fn main() -> Result<()> {
     tracker.spawn(app_driver.start(ct.clone()));
     tracker.spawn(game_fetcher.start(ct.clone(), game_fetcher_rx));
     tracker.spawn(tx_manager.start(ct.clone(), tx_manager_rx));
-    tracker.spawn(game_creator.start(ct.clone(), game_fetcher_notification));
+    tracker.spawn(game_creator.start(ct.clone(), game_fetcher_broadcast_rx));
     tracker.close();
 
     // Shutdown all the components
