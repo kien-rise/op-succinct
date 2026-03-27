@@ -18,7 +18,10 @@ use kona_host::{
 use kona_proof::HintType;
 use kona_providers_alloy::{OnlineBeaconClient, OnlineBlobProvider};
 use rise_fp::{
-    common::primitives::{derive_from, RpcArgs},
+    common::{
+        args::{ClRpcArgs, L1RpcArgs, L2RpcArgs},
+        primitives::RpcArgs,
+    },
     proof::host::{PartialEigenDAWitnessData, RiseCfg, RiseHintHandler},
     rpc::{
         cl::{self, SafeDBClient},
@@ -34,33 +37,6 @@ struct Args {
     #[command(subcommand)]
     command: Commands,
 }
-
-#[derive(Debug, clap::Args)]
-struct L1RpcArgs {
-    #[arg(long = "l1.rpc-url", id = "l1.rpc-url")]
-    rpc_url: Url,
-    #[arg(long = "l1.max-rps", id = "l1.max-rps")]
-    max_rps: Option<u32>,
-}
-derive_from!(L1RpcArgs, RpcArgs, [rpc_url, max_rps]);
-
-#[derive(Debug, clap::Args)]
-struct L2RpcArgs {
-    #[arg(long = "l2.rpc-url", id = "l2.rpc-url")]
-    rpc_url: Url,
-    #[arg(long = "l2.max-rps", id = "l2.max-rps")]
-    max_rps: Option<u32>,
-}
-derive_from!(L2RpcArgs, RpcArgs, [rpc_url, max_rps]);
-
-#[derive(Debug, clap::Args)]
-struct ClRpcArgs {
-    #[arg(long = "cl.rpc-url", id = "cl.rpc-url")]
-    rpc_url: Url,
-    #[arg(long = "cl.max-rps", id = "cl.max-rps")]
-    max_rps: Option<u32>,
-}
-derive_from!(ClRpcArgs, RpcArgs, [rpc_url, max_rps]);
 
 #[derive(Subcommand)]
 enum Commands {
@@ -111,11 +87,10 @@ async fn main() -> Result<()> {
 
             let l1_head: BlockHash = {
                 let mut safedb_client = SafeDBClient::new(cl_rpc.clone(), 64);
-                let start = cl::get_l1_origin(&cl_rpc, start_block).await?.number;
-                let end = el::get_block_header(&l1_rpc, BlockNumberOrTag::Finalized).await?.number;
-                let l1_number = safedb_client.l2_to_l1_safe(claim_block, start..end).await?;
-                let l1_header = el::get_block_header(&l1_rpc, l1_number.into()).await?;
-                l1_header.hash_slow()
+                match safedb_client.l2_to_l1_safe(claim_block, BlockNumberOrTag::Finalized).await? {
+                    Some(num_hash) => num_hash.hash,
+                    None => bail!("cannot find l1_safe"),
+                }
             };
 
             let (agreed_l2_output_root, agreed_l2_head_hash) = {
