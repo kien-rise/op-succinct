@@ -57,6 +57,7 @@ op-succinct-host-utils.workspace = true
 
 anyhow.workspace = true
 async-trait.workspace = true
+ciborium.workspace = true
 clap = { workspace = true, features = ["derive"] }
 futures.workspace = true
 kona-protocol.workspace = true

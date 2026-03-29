@@ -59,7 +59,8 @@ impl WitnessData for DefaultWitnessData {
     }
 }
 
-#[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)] //
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)] //
 pub struct EigenDAWitnessData {
     pub preimage_store: PreimageStore,
     pub blob_data: BlobData,
