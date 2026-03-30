@@ -15,7 +15,10 @@ use crate::{
         primitives::GameIndex,
         state::State,
     },
-    components::{game_fetcher::GameFetcherNotification, tx_manager::TxManagerRequest},
+    components::{
+        game_fetcher::GameFetcherNotification,
+        tx_manager::{TxManagerRequest, TxManagerSenderRole},
+    },
     rpc::{
         cl::{get_l1_origin, OutputResponse, SafeDBClient},
         el::get_block_header,
@@ -210,7 +213,13 @@ impl GameCreator {
             tracing::info!(?transaction_request, "sending transaction");
 
             let (done_tx, done_rx) = oneshot::channel();
-            self.tx_manager_tx.send(TxManagerRequest::Send(transaction_request, done_tx)).await?;
+            self.tx_manager_tx
+                .send(TxManagerRequest::Send(
+                    TxManagerSenderRole::Proposer,
+                    transaction_request,
+                    done_tx,
+                ))
+                .await?;
             let receipt = done_rx.await?;
             tracing::info!(?receipt, %bn, %parent_game_index, "transaction confirmed");
 

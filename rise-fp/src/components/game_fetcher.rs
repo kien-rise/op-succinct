@@ -11,7 +11,6 @@ use alloy_primitives::{Address, U256};
 use alloy_provider::{layers::CallBatchLayer, Provider, ProviderBuilder};
 use alloy_rpc_client::RpcClient;
 use anyhow::Result;
-use rand::seq::index::sample;
 use tokio::{
     sync::{broadcast, mpsc, oneshot, RwLock},
     task::JoinSet,
@@ -21,7 +20,10 @@ use tokio_util::sync::CancellationToken;
 
 use crate::common::{
     contract::{AnchorStateRegistry, DisputeGameFactory, OPSuccinctFaultDisputeGame},
-    primitives::{parse_duration, AnchorRootSnapshot, GameIndex, GameRangeInclusive, GameSnapshot},
+    primitives::{
+        parse_duration, pick_random_games, AnchorRootSnapshot, GameIndex, GameRangeInclusive,
+        GameSnapshot,
+    },
     state::State,
 };
 
@@ -164,14 +166,8 @@ impl GameFetcher {
         }
 
         // 3. Games between start and end
-        if end - start < batch_size as u32 {
-            for game_index in start..end {
-                try_push(game_index);
-            }
-        } else {
-            for i in sample(&mut rand::rng(), (end - start) as usize, batch_size) {
-                try_push(start + i as u32);
-            }
+        for game_index in pick_random_games(start..end, batch_size) {
+            try_push(game_index);
         }
 
         next_games

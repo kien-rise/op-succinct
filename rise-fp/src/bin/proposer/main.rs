@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
 
     let game_fetcher_broadcast_rx = game_fetcher.subscribe();
 
-    let tx_manager = TxManager::new(args.tx_manager_config, l1_rpc.clone());
+    let tx_manager = TxManager::new(args.tx_manager_config, l1_rpc.clone())?;
 
     let game_creator = GameCreator::new(
         state.clone(),

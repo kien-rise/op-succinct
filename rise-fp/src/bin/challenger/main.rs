@@ -14,8 +14,9 @@ use rise_fp::{
         state::State,
     },
     components::{
-        game_challenger::GameChallenger,
+        game_challenger::{GameChallenger, GameChallengerConfig},
         game_fetcher::{GameFetcher, GameFetcherConfig, GameFetcherRequest},
+        tx_manager::{TxManager, TxManagerConfig, TxManagerRequest},
     },
     rpc::{cl, el},
 };
@@ -30,6 +31,10 @@ struct Args {
     cl_rpc_args: ClRpcArgs,
     #[command(flatten)]
     game_fetcher_config: GameFetcherConfig,
+    #[command(flatten)]
+    game_challenger_config: GameChallengerConfig,
+    #[command(flatten)]
+    tx_manager_config: TxManagerConfig,
 }
 
 #[tokio::main]
@@ -51,6 +56,7 @@ async fn main() -> Result<()> {
     // Create states, channels, notifications
     let state = Arc::new(RwLock::new(State::default()));
     let (game_fetcher_tx, game_fetcher_rx) = GameFetcherRequest::channel();
+    let (tx_manager_tx, tx_manager_rx) = TxManagerRequest::channel();
 
     // Fetch contract addresses
     let rollup_config = cl::get_rollup_config(&cl_rpc).await?;
@@ -70,13 +76,22 @@ async fn main() -> Result<()> {
 
     let game_fetcher_broadcast_rx = game_fetcher.subscribe();
 
-    let game_challenger = GameChallenger::new(state.clone(), l2_rpc.clone());
+    let game_challenger = GameChallenger::new(
+        args.game_challenger_config,
+        state.clone(),
+        l1_rpc.clone(),
+        l2_rpc.clone(),
+        tx_manager_tx,
+    );
+
+    let tx_manager = TxManager::new(args.tx_manager_config, l1_rpc.clone())?;
 
     // Start all the components
     let ct = CancellationToken::new();
     let tracker = TaskTracker::new();
     tracker.spawn(game_fetcher.start(ct.clone(), game_fetcher_rx));
     tracker.spawn(game_challenger.start(ct.clone(), game_fetcher_broadcast_rx));
+    tracker.spawn(tx_manager.start(ct.clone(), tx_manager_rx));
     tracker.close();
 
     // Shutdown all the components

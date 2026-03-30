@@ -52,10 +52,7 @@ impl State {
 
     // Check if challenging this game will surely win us the bond.
     // See contracts/src/fp/OPSuccinctFaultDisputeGame.sol#resolve()
-    pub fn should_challenge_game(&self, game_index: GameIndex, now: BlockTimestamp) -> bool {
-        let Some(game) = self.games.get(&game_index) else {
-            return false;
-        };
+    pub fn should_challenge_game(&self, game: &GameSnapshot, now: BlockTimestamp) -> bool {
         if !game.can_challenge(now) {
             return false;
         }

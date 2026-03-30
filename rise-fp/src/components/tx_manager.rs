@@ -1,20 +1,27 @@
 use std::time::Duration;
 
+use alloy_network::EthereumWallet;
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_client::RpcClient;
 use alloy_rpc_types_eth::{TransactionReceipt, TransactionRequest};
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use crate::common::{
-    args::{ProposerSignerArgs, SignerArgs},
+    args::{ChallengerSignerArgs, ProposerSignerArgs, SignerArgs},
     primitives::parse_duration,
 };
 
 #[derive(Debug)]
+pub enum TxManagerSenderRole {
+    Proposer,
+    Challenger,
+}
+
+#[derive(Debug)]
 pub enum TxManagerRequest {
-    Send(TransactionRequest, oneshot::Sender<TransactionReceipt>),
+    Send(TxManagerSenderRole, TransactionRequest, oneshot::Sender<TransactionReceipt>),
 }
 
 impl TxManagerRequest {
@@ -37,31 +44,64 @@ pub struct TxManagerConfig {
     pub timeout: Option<Duration>,
 
     #[command(flatten)]
-    pub proposer_signer_args: ProposerSignerArgs,
+    pub proposer_signer_args: Option<ProposerSignerArgs>,
+    #[command(flatten)]
+    pub challenger_signer_args: Option<ChallengerSignerArgs>,
 }
 
 pub struct TxManager {
     config: TxManagerConfig,
     l1_rpc: RpcClient,
+    proposer_wallet: Option<EthereumWallet>,
+    challenger_wallet: Option<EthereumWallet>,
 }
 
 impl TxManager {
-    pub fn new(config: TxManagerConfig, l1_rpc: RpcClient) -> Self {
-        Self { config, l1_rpc }
+    pub fn new(config: TxManagerConfig, l1_rpc: RpcClient) -> Result<Self> {
+        let proposer_wallet = match config.proposer_signer_args.as_ref() {
+            Some(args) => Some(SignerArgs::from(args).build_wallet().context("proposer wallet")?),
+            None => None,
+        };
+
+        let challenger_wallet = match config.challenger_signer_args.as_ref() {
+            Some(args) => Some(SignerArgs::from(args).build_wallet().context("challenger wallet")?),
+            None => None,
+        };
+
+        Ok(Self { config, l1_rpc, proposer_wallet, challenger_wallet })
     }
 
-    async fn dispatch(&self, request: TxManagerRequest, l1_provider: impl Provider) -> Result<()> {
+    async fn process<P: Provider>(
+        &self,
+        request: TxManagerRequest,
+        proposer: Option<&P>,
+        challenger: Option<&P>,
+    ) -> Result<()> {
         match request {
-            TxManagerRequest::Send(transaction_request, done) => {
-                let mut pending_tx = l1_provider.send_transaction(transaction_request).await?;
+            TxManagerRequest::Send(sender_role, transaction_request, done) => {
+                let sender = match sender_role {
+                    TxManagerSenderRole::Proposer => {
+                        proposer.ok_or_else(|| anyhow!("proposer wallet not configured"))?
+                    }
+                    TxManagerSenderRole::Challenger => {
+                        challenger.ok_or_else(|| anyhow!("challenger wallet not configured"))?
+                    }
+                };
+
+                tracing::info!(?sender_role, ?transaction_request, "Broadcasting transaction");
+                let mut pending_tx = sender.send_transaction(transaction_request).await?;
                 if let Some(num) = self.config.num_confirmations {
                     pending_tx.set_required_confirmations(num);
                 }
                 if let Some(dur) = self.config.timeout {
                     pending_tx.set_timeout(Some(dur));
                 }
+
+                tracing::info!(tx_hash = ?pending_tx.tx_hash(), "Awaiting confirmation");
                 let receipt = pending_tx.get_receipt().await?;
                 // TODO: we need to reset the nonce from l1_provider if any tx fails
+
+                tracing::info!(tx_hash = ?receipt.transaction_hash, ?receipt, "Submitted transaction successfully");
                 let _ = done.send(receipt);
             }
         }
@@ -69,22 +109,19 @@ impl TxManager {
     }
 
     pub async fn start(self, ct: CancellationToken, mut rx: mpsc::Receiver<TxManagerRequest>) {
-        // TODO: distinguish proposer and challenger wallets
-        let wallet = match SignerArgs::from(self.config.proposer_signer_args.clone()).build_wallet()
-        {
-            Ok(w) => w,
-            Err(err) => {
-                tracing::error!(%err, "Failed to build wallet");
-                return;
-            }
-        };
-        let l1_provider = ProviderBuilder::new().wallet(wallet).connect_client(self.l1_rpc.clone());
+        let proposer: Option<_> = (self.proposer_wallet.as_ref())
+            .map(|w| ProviderBuilder::new().wallet(w).connect_client(self.l1_rpc.clone()));
+
+        let challenger: Option<_> = (self.challenger_wallet.as_ref())
+            .map(|w| ProviderBuilder::new().wallet(w).connect_client(self.l1_rpc.clone()));
 
         loop {
             match ct.run_until_cancelled(rx.recv()).await {
                 Some(Some(request)) => {
                     tracing::debug!(?request, "Handling request");
-                    if let Err(err) = self.dispatch(request, &l1_provider).await {
+                    if let Err(err) =
+                        self.process(request, proposer.as_ref(), challenger.as_ref()).await
+                    {
                         tracing::error!(%err, "Failed to handle request");
                     }
                 }

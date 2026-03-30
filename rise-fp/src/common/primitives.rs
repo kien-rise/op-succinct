@@ -46,6 +46,21 @@ impl RangeBounds<GameIndex> for GameRangeInclusive {
     }
 }
 
+pub fn pick_random_games(range: Range<GameIndex>, len: usize) -> Vec<GameIndex> {
+    if len == 0 || range.is_empty() {
+        return vec![]
+    }
+
+    if len >= range.len() {
+        return range.collect();
+    }
+
+    rand::seq::index::sample(&mut rand::rng(), range.len(), len)
+        .into_iter()
+        .map(|i| range.start + i as GameIndex)
+        .collect()
+}
+
 #[derive(Debug, PartialEq)]
 pub struct GameSnapshot {
     pub game_type: u32,
