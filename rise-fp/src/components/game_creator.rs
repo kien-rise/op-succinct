@@ -157,7 +157,8 @@ impl GameCreator {
         let mut games = Vec::with_capacity(max_games_to_create);
         let mut current = canonical_claim_block + 1;
         while current <= l2_finalized && games.len() < max_games_to_create {
-            let l1_safe = safe_db_client.l2_to_l1_safe_within_range(current, l1_block_range.clone()).await?;
+            let l1_safe =
+                safe_db_client.l2_to_l1_safe_within_range(current, l1_block_range.clone()).await?;
             let l2_safe = safe_db_client.l1_to_l2_safe(l1_safe, Some(current)).await?;
             games.push(l2_safe);
             current = l2_safe + 1;

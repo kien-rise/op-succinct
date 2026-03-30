@@ -206,6 +206,18 @@ macro_rules! derive_from {
             }
         }
     };
+
+    (&$from:ident, $to:ident, [$($field:ident),*]) => {
+        impl From<&$from> for $to {
+            fn from(source: &$from) -> Self {
+                Self {
+                    $(
+                        $field: source.$field.clone(),
+                    )*
+                }
+            }
+        }
+    };
 }
 
 pub use derive_from;

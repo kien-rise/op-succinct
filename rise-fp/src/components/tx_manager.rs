@@ -1,16 +1,16 @@
 use std::time::Duration;
 
-use alloy_network::EthereumWallet;
-use alloy_primitives::B256;
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_client::RpcClient;
 use alloy_rpc_types_eth::{TransactionReceipt, TransactionRequest};
-use alloy_signer_local::PrivateKeySigner;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
-use crate::common::primitives::parse_duration;
+use crate::common::{
+    args::{ProposerSignerArgs, SignerArgs},
+    primitives::parse_duration,
+};
 
 #[derive(Debug)]
 pub enum TxManagerRequest {
@@ -20,22 +20,6 @@ pub enum TxManagerRequest {
 impl TxManagerRequest {
     pub fn channel() -> (mpsc::Sender<Self>, mpsc::Receiver<Self>) {
         mpsc::channel(256)
-    }
-}
-
-#[derive(Debug, clap::Args)]
-pub struct SignerArgs {
-    #[arg(id = "tx-manager.private-key", long = "tx-manager.private-key")]
-    private_key: Option<B256>,
-}
-
-impl SignerArgs {
-    fn build_wallet(&self) -> Result<EthereumWallet> {
-        if let Some(pk) = self.private_key {
-            let signer = PrivateKeySigner::from_bytes(&pk)?;
-            return Ok(EthereumWallet::from(signer));
-        }
-        bail!("no signer configured")
     }
 }
 
@@ -53,7 +37,7 @@ pub struct TxManagerConfig {
     pub timeout: Option<Duration>,
 
     #[command(flatten)]
-    pub signer_args: SignerArgs,
+    pub proposer_signer_args: ProposerSignerArgs,
 }
 
 pub struct TxManager {
@@ -85,7 +69,9 @@ impl TxManager {
     }
 
     pub async fn start(self, ct: CancellationToken, mut rx: mpsc::Receiver<TxManagerRequest>) {
-        let wallet = match self.config.signer_args.build_wallet() {
+        // TODO: distinguish proposer and challenger wallets
+        let wallet = match SignerArgs::from(self.config.proposer_signer_args.clone()).build_wallet()
+        {
             Ok(w) => w,
             Err(err) => {
                 tracing::error!(%err, "Failed to build wallet");
