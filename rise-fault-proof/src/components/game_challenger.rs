@@ -20,7 +20,7 @@ use crate::{
         game_fetcher::{GameFetcherRequest, SyncResult},
         tx_manager::{TxManagerRequest, TxManagerSenderRole},
     },
-    rpc::el,
+    rpc::el::MultiHeaderProvider,
 };
 
 #[derive(Debug, clap::Args)]
@@ -29,21 +29,21 @@ pub struct GameChallengerConfig {
     pub batch_size: NonZeroUsize,
 }
 
-pub struct GameChallenger {
+pub struct GameChallenger<L2: MultiHeaderProvider> {
     config: GameChallengerConfig,
     state: Arc<RwLock<State>>,
     l1_rpc: RpcClient,
-    l2_rpc: RpcClient,
+    l2_rpc: L2,
     game_fetcher_tx: mpsc::Sender<GameFetcherRequest>,
     tx_manager_tx: mpsc::Sender<TxManagerRequest>,
 }
 
-impl GameChallenger {
+impl<L2: MultiHeaderProvider> GameChallenger<L2> {
     pub fn new(
         config: GameChallengerConfig,
         state: Arc<RwLock<State>>,
         l1_rpc: RpcClient,
-        l2_rpc: RpcClient,
+        l2_rpc: L2,
         game_fetcher_tx: mpsc::Sender<GameFetcherRequest>,
         tx_manager_tx: mpsc::Sender<TxManagerRequest>,
     ) -> Self {
@@ -92,12 +92,13 @@ impl GameChallenger {
         };
         tracing::info!(?block_numbers, "Fetching output roots for block numbers");
 
-        let output_roots: BTreeMap<BlockNumber, B256> =
-            el::get_block_headers(&self.l2_rpc, &block_numbers)
-                .await?
-                .iter()
-                .filter_map(|h| Self::__get_output_root(h).map(|r| (h.number, r)))
-                .collect();
+        let output_roots: BTreeMap<BlockNumber, B256> = self
+            .l2_rpc
+            .get_block_headers(&block_numbers)
+            .await?
+            .iter()
+            .filter_map(|h| Self::__get_output_root(h).map(|r| (h.number, r)))
+            .collect();
         tracing::info!(?output_roots, "Fetched correct output roots");
 
         self.state.write().await.correct_output_roots.extend(output_roots);

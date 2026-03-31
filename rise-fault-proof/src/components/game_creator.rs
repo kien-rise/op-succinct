@@ -20,8 +20,8 @@ use crate::{
         tx_manager::{TxManagerRequest, TxManagerSenderRole},
     },
     rpc::{
-        cl::{get_l1_origin, OutputResponse, SafeDBClient},
-        el::get_block_header,
+        cl::{self, OutputResponse, SafeDBClient},
+        el::SingleHeaderProvider,
         utils::batch_call,
     },
 };
@@ -46,22 +46,22 @@ pub struct GameCreatorConfig {
     pub safedb_query_batch_size: NonZeroUsize,
 }
 
-pub struct GameCreator {
+pub struct GameCreator<L2: SingleHeaderProvider> {
     state: Arc<RwLock<State>>,
     config: GameCreatorConfig,
     l1_rpc: RpcClient,
-    l2_rpc: RpcClient,
+    l2_rpc: L2,
     cl_rpc: RpcClient,
     factory_address: Address,
     tx_manager_tx: mpsc::Sender<TxManagerRequest>,
 }
 
-impl GameCreator {
+impl<L2: SingleHeaderProvider> GameCreator<L2> {
     pub fn new(
         state: Arc<RwLock<State>>,
         config: GameCreatorConfig,
         l1_rpc: RpcClient,
-        l2_rpc: RpcClient,
+        l2_rpc: L2,
         cl_rpc: RpcClient,
         factory_address: Address,
         tx_manager_tx: mpsc::Sender<TxManagerRequest>,
@@ -148,13 +148,11 @@ impl GameCreator {
         canonical_claim_block: BlockNumber,
         max_games_to_create: usize,
     ) -> Result<Vec<BlockNumber>> {
-        let l1_finalized =
-            get_block_header(&self.l1_rpc, BlockNumberOrTag::Finalized).await?.number;
-        let l2_finalized =
-            get_block_header(&self.l2_rpc, BlockNumberOrTag::Finalized).await?.number;
+        let l1_finalized = self.l1_rpc.get_block_header(BlockNumberOrTag::Finalized).await?.number;
+        let l2_finalized = self.l2_rpc.get_block_header(BlockNumberOrTag::Finalized).await?.number;
         let mut safe_db_client =
             SafeDBClient::new(self.cl_rpc.clone(), self.config.safedb_query_batch_size.get());
-        let canonical_l1_origin = get_l1_origin(&self.cl_rpc, canonical_claim_block).await?;
+        let canonical_l1_origin = cl::get_l1_origin(&self.cl_rpc, canonical_claim_block).await?;
         let l1_block_range = canonical_l1_origin.number..l1_finalized;
 
         let mut games = Vec::with_capacity(max_games_to_create);

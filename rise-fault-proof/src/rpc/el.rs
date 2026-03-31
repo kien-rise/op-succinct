@@ -6,6 +6,7 @@ use alloy_rlp::Decodable;
 use alloy_rpc_client::RpcClient;
 use alloy_rpc_types_eth::Block;
 use alloy_transport::{RpcError, TransportResult};
+use async_trait::async_trait;
 use futures::future::try_join_all;
 
 use crate::{
@@ -82,4 +83,34 @@ pub async fn get_factory_and_registry_addresses(
         .map_err(RpcError::local_usage)?;
 
     Ok((factory, registry))
+}
+
+#[async_trait]
+pub trait MultiHeaderProvider {
+    async fn get_block_headers(
+        &self,
+        block_numbers: &[BlockNumber],
+    ) -> TransportResult<Vec<Header>>;
+}
+
+#[async_trait]
+impl MultiHeaderProvider for RpcClient {
+    async fn get_block_headers(
+        &self,
+        block_numbers: &[BlockNumber],
+    ) -> TransportResult<Vec<Header>> {
+        get_block_headers(self, block_numbers).await
+    }
+}
+
+#[async_trait]
+pub trait SingleHeaderProvider {
+    async fn get_block_header(&self, block_number: BlockNumberOrTag) -> TransportResult<Header>;
+}
+
+#[async_trait]
+impl SingleHeaderProvider for RpcClient {
+    async fn get_block_header(&self, block_number: BlockNumberOrTag) -> TransportResult<Header> {
+        get_block_header(self, block_number).await
+    }
 }

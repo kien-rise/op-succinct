@@ -188,7 +188,7 @@ impl WitnessGenerator for EigenDAWitnessGenerator {
 
         let maybe_canoe_proof_bytes = if let Some(proof) = maybe_canoe_proof {
             Some(serde_cbor::to_vec(&proof)?)
-        } else if self.mock_mode == None {
+        } else if self.mock_mode.is_none() {
             Some(vec![])
         } else {
             None
