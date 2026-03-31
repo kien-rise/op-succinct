@@ -6,7 +6,7 @@ use alloy_rpc_client::RpcClient;
 use alloy_transport_http::reqwest::Url;
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
-use rise_fp::{
+use rise_fault_proof::{
     common::{
         args::{ClRpcArgs, L1RpcArgs, L2RpcArgs},
         primitives::RpcArgs,

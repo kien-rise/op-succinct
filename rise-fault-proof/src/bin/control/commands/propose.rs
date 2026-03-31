@@ -4,7 +4,7 @@ use alloy_rpc_client::RpcClient;
 use alloy_sol_types::SolValue;
 use anyhow::Result;
 use op_succinct_host_utils::DisputeGameFactory;
-use rise_fp::{
+use rise_fault_proof::{
     common::{
         args::{ClRpcArgs, L1RpcArgs, ProposerSignerArgs, SignerArgs},
         primitives::{GameIndex, RpcArgs},

@@ -7,14 +7,14 @@ use tokio::{signal, sync::RwLock};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing_subscriber::EnvFilter;
 
-use rise_fp::{
+use rise_fault_proof::{
     common::{
         args::{ClRpcArgs, L1RpcArgs, L2RpcArgs},
         primitives::RpcArgs,
         state::State,
     },
     components::{
-        game_challenger::{GameChallenger, GameChallengerConfig},
+        game_creator::{GameCreator, GameCreatorConfig},
         game_fetcher::{GameFetcher, GameFetcherConfig, GameFetcherRequest},
         tx_manager::{TxManager, TxManagerConfig, TxManagerRequest},
     },
@@ -32,7 +32,7 @@ struct Args {
     #[command(flatten)]
     game_fetcher_config: GameFetcherConfig,
     #[command(flatten)]
-    game_challenger_config: GameChallengerConfig,
+    game_creator_config: GameCreatorConfig,
     #[command(flatten)]
     tx_manager_config: TxManagerConfig,
 }
@@ -76,29 +76,31 @@ async fn main() -> Result<()> {
 
     let game_fetcher_broadcast_rx = game_fetcher.subscribe();
 
-    let game_challenger = GameChallenger::new(
-        args.game_challenger_config,
+    let tx_manager = TxManager::new(args.tx_manager_config, l1_rpc.clone())?;
+
+    let game_creator = GameCreator::new(
         state.clone(),
+        args.game_creator_config,
         l1_rpc.clone(),
         l2_rpc.clone(),
-        game_fetcher_tx,
+        cl_rpc.clone(),
+        factory_address,
         tx_manager_tx,
     );
-
-    let tx_manager = TxManager::new(args.tx_manager_config, l1_rpc.clone())?;
 
     // Start all the components
     let ct = CancellationToken::new();
     let tracker = TaskTracker::new();
     tracker.spawn(game_fetcher.start(ct.clone(), game_fetcher_rx));
-    tracker.spawn(game_challenger.start(ct.clone(), game_fetcher_broadcast_rx));
     tracker.spawn(tx_manager.start(ct.clone(), tx_manager_rx));
+    tracker.spawn(game_creator.start(ct.clone(), game_fetcher_broadcast_rx));
     tracker.close();
 
     // Shutdown all the components
     signal::ctrl_c().await?;
     ct.cancel();
     tracker.wait().await;
+    drop(game_fetcher_tx); // we will use this later
 
     Ok(())
 }

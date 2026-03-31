@@ -17,7 +17,7 @@ members = [
     "validity",
     "fault-proof",
     "bindings",
-    "rise-fp",
+    "rise-fault-proof",
 ]
 resolver = "2"
 
