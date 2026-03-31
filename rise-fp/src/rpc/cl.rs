@@ -157,6 +157,7 @@ impl SafeDBClient {
                 let skips = bresenham(end - start - bs, bs + 1);
                 let mut current = start;
                 let mut queries = Vec::with_capacity(self.batch_size);
+                #[allow(clippy::needless_range_loop)]
                 for i in 0..self.batch_size {
                     current += skips[i];
                     queries.push(current);

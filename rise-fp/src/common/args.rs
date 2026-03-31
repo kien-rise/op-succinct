@@ -52,7 +52,7 @@ impl SignerArgs {
             SignerMode::Local => {
                 let pk = self.private_key.ok_or_else(|| anyhow!("private key not provided"))?;
                 let signer = PrivateKeySigner::from_bytes(&pk)?;
-                return Ok(EthereumWallet::from(signer));
+                Ok(EthereumWallet::from(signer))
             }
         }
     }

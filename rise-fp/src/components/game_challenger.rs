@@ -17,7 +17,7 @@ use crate::{
         state::State,
     },
     components::{
-        game_fetcher::{GameFetcherNotification, GameFetcherRequest},
+        game_fetcher::{GameFetcherRequest, SyncResult},
         tx_manager::{TxManagerRequest, TxManagerSenderRole},
     },
     rpc::el,
@@ -104,7 +104,7 @@ impl GameChallenger {
         Ok(())
     }
 
-    pub async fn process(&self, noti: GameFetcherNotification) -> Result<()> {
+    pub async fn process(&self, noti: SyncResult) -> Result<()> {
         let now: BlockTimestamp =
             SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
         self.refresh_games(noti.fetched_games.keys().copied()).await?;
@@ -147,7 +147,7 @@ impl GameChallenger {
     pub async fn start(
         self,
         ct: CancellationToken,
-        mut game_fetcher_broadcast_rx: broadcast::Receiver<GameFetcherNotification>,
+        mut game_fetcher_broadcast_rx: broadcast::Receiver<SyncResult>,
     ) {
         loop {
             match ct.run_until_cancelled(game_fetcher_broadcast_rx.recv()).await {

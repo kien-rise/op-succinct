@@ -16,7 +16,7 @@ use crate::{
         state::State,
     },
     components::{
-        game_fetcher::GameFetcherNotification,
+        game_fetcher::SyncResult,
         tx_manager::{TxManagerRequest, TxManagerSenderRole},
     },
     rpc::{
@@ -257,7 +257,7 @@ impl GameCreator {
         Ok(())
     }
 
-    async fn step(&self) -> Result<()> {
+    async fn process(&self) -> Result<()> {
         let canonical_head = {
             let state = self.state.read().await;
             Self::__get_canonical_head(&state)
@@ -281,15 +281,15 @@ impl GameCreator {
     pub async fn start(
         self,
         ct: CancellationToken,
-        mut game_fetcher_broadcast_rx: broadcast::Receiver<GameFetcherNotification>,
+        mut game_fetcher_broadcast_rx: broadcast::Receiver<SyncResult>,
     ) {
         while let Some(notification_result) =
             ct.run_until_cancelled(game_fetcher_broadcast_rx.recv()).await
         {
             tracing::debug!(?notification_result, "Receive GameFetcher notification");
-            match self.step().await {
-                Ok(_) => {}
-                Err(err) => tracing::error!(%err, "Failed to step"),
+            match self.process().await {
+                Ok(()) => tracing::debug!("Processed successfully"),
+                Err(err) => tracing::error!(%err, "Failed to process"),
             }
         }
     }

@@ -14,12 +14,13 @@ use anyhow::Result;
 use tokio::{
     sync::{broadcast, mpsc, oneshot, RwLock},
     task::JoinSet,
-    time::timeout,
+    time::{interval, MissedTickBehavior},
 };
 use tokio_util::sync::CancellationToken;
 
 use crate::common::{
     contract::{AnchorStateRegistry, DisputeGameFactory, OPSuccinctFaultDisputeGame},
+    misc::{select2, Either},
     primitives::{
         parse_duration, pick_random_games, AnchorRootSnapshot, GameIndex, GameRangeInclusive,
         GameSnapshot,
@@ -52,7 +53,7 @@ pub struct GameFetcherConfig {
 #[derive(Debug)]
 pub enum GameFetcherRequest {
     // Request to sync multiple games; returns whether any changes occurred
-    Sync(oneshot::Sender<bool>),
+    Sync(oneshot::Sender<()>),
     // Request to sync a single game; returns whether any changes occurred
     SyncOne(GameIndex, oneshot::Sender<bool>),
 }
@@ -64,7 +65,9 @@ impl GameFetcherRequest {
 }
 
 #[derive(Debug, Clone)]
-pub struct GameFetcherNotification {
+pub struct SyncResult {
+    pub game_count: u32,
+    pub anchor_root: AnchorRootSnapshot,
     pub fetched_games: BTreeMap<GameIndex, bool>,
 }
 
@@ -75,7 +78,7 @@ pub struct GameFetcher {
     factory_address: Address,
     registry_address: Address,
 
-    broadcast_tx: broadcast::Sender<GameFetcherNotification>,
+    broadcast_tx: broadcast::Sender<SyncResult>,
 }
 
 impl GameFetcher {
@@ -100,7 +103,7 @@ impl GameFetcher {
         }
     }
 
-    pub fn subscribe(&self) -> broadcast::Receiver<GameFetcherNotification> {
+    pub fn subscribe(&self) -> broadcast::Receiver<SyncResult> {
         self.broadcast_tx.subscribe()
     }
 
@@ -234,7 +237,7 @@ impl GameFetcher {
     }
 
     // Fetches one game. Returns whether the game has been changed.
-    async fn fetch_game(&self, game_index: GameIndex) -> Result<bool> {
+    async fn sync_one(&self, game_index: GameIndex) -> Result<bool> {
         let l1_provider = self.l1_provider();
         let game_snapshot = Self::__fetch_game(
             l1_provider,
@@ -294,19 +297,30 @@ impl GameFetcher {
         Ok(updated_games)
     }
 
-    async fn dispatch(&self, request: GameFetcherRequest) -> Result<()> {
+    async fn sync(&self) -> Result<SyncResult> {
+        let (game_count, anchor_root) = self.fetch_metadata().await?;
+        let fetched_games = self.fetch_new_games().await?;
+        Ok(SyncResult { game_count, anchor_root, fetched_games })
+    }
+
+    async fn handle_idle(&self) -> Result<bool> {
+        tracing::info!("Syncing games...");
+        let noti = self.sync().await?;
+        let changed = noti.fetched_games.values().any(|changed| *changed);
+        tracing::info!(?changed, ?noti, "Synced games");
+        let _ = self.broadcast_tx.send(noti);
+        Ok(changed)
+    }
+
+    async fn handle_request(&self, request: GameFetcherRequest) -> Result<()> {
         match request {
             GameFetcherRequest::Sync(done) => {
-                let (game_count, anchor_root) = self.fetch_metadata().await?;
-                tracing::info!(%game_count, ?anchor_root, "Metadata updated");
-                let fetched_games = self.fetch_new_games().await?;
-                tracing::info!(?fetched_games, "Fetched games");
-                let changed = fetched_games.values().any(|changed| *changed);
-                let _ = done.send(changed);
-                let _ = self.broadcast_tx.send(GameFetcherNotification { fetched_games });
+                let noti = self.sync().await?;
+                let _ = done.send(());
+                let _ = self.broadcast_tx.send(noti);
             }
             GameFetcherRequest::SyncOne(game_index, done) => {
-                let changed = self.fetch_game(game_index).await?;
+                let changed = self.sync_one(game_index).await?;
                 let _ = done.send(changed);
                 // NOTE: No need to call self.broadcast_tx.send() here. The game_index
                 // refers to an existing game. This behavior can be revisited later.
@@ -316,36 +330,38 @@ impl GameFetcher {
     }
 
     pub async fn start(self, ct: CancellationToken, mut rx: mpsc::Receiver<GameFetcherRequest>) {
-        let mut immediate = true;
-        loop {
-            let delay = if immediate { Duration::ZERO } else { self.config.poll_interval };
-            immediate = false;
+        let mut timer = interval(self.config.poll_interval);
+        timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
-            match ct.run_until_cancelled(timeout(delay, rx.recv())).await {
+        loop {
+            match ct.run_until_cancelled(select2(timer.tick(), rx.recv())).await {
                 None => {
                     tracing::info!("Shutdown signal received, stopping");
                     break;
                 }
-                Some(Err(_elapsed)) => {
-                    tracing::debug!("Handling idle");
-                    let (done_tx, done_rx) = oneshot::channel();
-                    if let Err(err) = self.dispatch(GameFetcherRequest::Sync(done_tx)).await {
-                        tracing::error!(%err, "Failed to handle request");
-                    }
-                    if let Ok(changed) = done_rx.await {
+                Some(Either::Left(_instant)) => match self.handle_idle().await {
+                    Ok(changed) => {
                         if changed {
-                            immediate = true;
+                            timer.reset_immediately();
                         }
                     }
-                }
-                Some(Ok(None)) => {
-                    tracing::info!("Channel closed, stopping");
+                    Err(err) => {
+                        tracing::error!(%err, "Failed to sync games");
+                    }
+                },
+                Some(Either::Right(None)) => {
+                    tracing::warn!("Channel closed, stopping");
                     break;
                 }
-                Some(Ok(Some(request))) => {
+                Some(Either::Right(Some(request))) => {
                     tracing::debug!(?request, "Handling request");
-                    if let Err(err) = self.dispatch(request).await {
-                        tracing::error!(%err, "Failed to handle request");
+                    match self.handle_request(request).await {
+                        Ok(()) => {
+                            tracing::debug!("Handled request");
+                        }
+                        Err(err) => {
+                            tracing::error!(%err, "Failed to handle request");
+                        }
                     }
                 }
             }

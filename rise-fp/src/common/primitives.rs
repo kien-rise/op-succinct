@@ -94,7 +94,7 @@ impl GameSnapshot {
         if self.game_status == GameStatus::CHALLENGER_WINS {
             return false;
         }
-        return true;
+        true
     }
 
     pub fn is_retired(&self, retirement_timestamp: BlockTimestamp) -> bool {

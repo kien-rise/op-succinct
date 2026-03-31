@@ -1,6 +1,7 @@
 pub mod common {
     pub mod args;
     pub mod contract;
+    pub mod misc;
     pub mod primitives;
     pub mod state;
 }
