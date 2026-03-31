@@ -81,6 +81,7 @@ async fn main() -> Result<()> {
         state.clone(),
         l1_rpc.clone(),
         l2_rpc.clone(),
+        game_fetcher_tx,
         tx_manager_tx,
     );
 
@@ -98,7 +99,6 @@ async fn main() -> Result<()> {
     signal::ctrl_c().await?;
     ct.cancel();
     tracker.wait().await;
-    drop(game_fetcher_tx); // we will use this later
 
     Ok(())
 }

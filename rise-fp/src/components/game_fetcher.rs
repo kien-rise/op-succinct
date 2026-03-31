@@ -51,9 +51,10 @@ pub struct GameFetcherConfig {
 
 #[derive(Debug)]
 pub enum GameFetcherRequest {
-    // request to sync, returns a bool indicating if any changes happens
-    Step(oneshot::Sender<bool>),
-    // more types will be added later
+    // Request to sync multiple games; returns whether any changes occurred
+    Sync(oneshot::Sender<bool>),
+    // Request to sync a single game; returns whether any changes occurred
+    SyncOne(GameIndex, oneshot::Sender<bool>),
 }
 
 impl GameFetcherRequest {
@@ -232,6 +233,22 @@ impl GameFetcher {
         Ok(game_snapshot)
     }
 
+    // Fetches one game. Returns whether the game has been changed.
+    async fn fetch_game(&self, game_index: GameIndex) -> Result<bool> {
+        let l1_provider = self.l1_provider();
+        let game_snapshot = Self::__fetch_game(
+            l1_provider,
+            self.factory_address,
+            self.registry_address,
+            game_index,
+        )
+        .await?;
+        let changed = self.state.write().await.insert_game(game_index, game_snapshot);
+        Ok(changed)
+    }
+
+    // Fetches games (may refetch existing ones).
+    // Returns a map of games with a flag indicating whether each game has changed
     async fn fetch_new_games(&self) -> Result<BTreeMap<GameIndex, bool>> {
         let (fetched_range, game_count) = {
             let state = self.state.read().await;
@@ -279,14 +296,20 @@ impl GameFetcher {
 
     async fn dispatch(&self, request: GameFetcherRequest) -> Result<()> {
         match request {
-            GameFetcherRequest::Step(done) => {
+            GameFetcherRequest::Sync(done) => {
                 let (game_count, anchor_root) = self.fetch_metadata().await?;
                 tracing::info!(%game_count, ?anchor_root, "Metadata updated");
                 let fetched_games = self.fetch_new_games().await?;
                 tracing::info!(?fetched_games, "Fetched games");
-                let has_progress = fetched_games.values().any(|changed| *changed);
-                let _ = done.send(has_progress);
+                let changed = fetched_games.values().any(|changed| *changed);
+                let _ = done.send(changed);
                 let _ = self.broadcast_tx.send(GameFetcherNotification { fetched_games });
+            }
+            GameFetcherRequest::SyncOne(game_index, done) => {
+                let changed = self.fetch_game(game_index).await?;
+                let _ = done.send(changed);
+                // NOTE: No need to call self.broadcast_tx.send() here. The game_index
+                // refers to an existing game. This behavior can be revisited later.
             }
         }
         Ok(())
@@ -306,11 +329,11 @@ impl GameFetcher {
                 Some(Err(_elapsed)) => {
                     tracing::debug!("Handling idle");
                     let (done_tx, done_rx) = oneshot::channel();
-                    if let Err(err) = self.dispatch(GameFetcherRequest::Step(done_tx)).await {
+                    if let Err(err) = self.dispatch(GameFetcherRequest::Sync(done_tx)).await {
                         tracing::error!(%err, "Failed to handle request");
                     }
-                    if let Ok(progress) = done_rx.await {
-                        if progress {
+                    if let Ok(changed) = done_rx.await {
+                        if changed {
                             immediate = true;
                         }
                     }

@@ -17,7 +17,7 @@ use crate::{
         state::State,
     },
     components::{
-        game_fetcher::GameFetcherNotification,
+        game_fetcher::{GameFetcherNotification, GameFetcherRequest},
         tx_manager::{TxManagerRequest, TxManagerSenderRole},
     },
     rpc::el,
@@ -34,6 +34,7 @@ pub struct GameChallenger {
     state: Arc<RwLock<State>>,
     l1_rpc: RpcClient,
     l2_rpc: RpcClient,
+    game_fetcher_tx: mpsc::Sender<GameFetcherRequest>,
     tx_manager_tx: mpsc::Sender<TxManagerRequest>,
 }
 
@@ -43,9 +44,10 @@ impl GameChallenger {
         state: Arc<RwLock<State>>,
         l1_rpc: RpcClient,
         l2_rpc: RpcClient,
+        game_fetcher_tx: mpsc::Sender<GameFetcherRequest>,
         tx_manager_tx: mpsc::Sender<TxManagerRequest>,
     ) -> Self {
-        Self { config, state, l1_rpc, l2_rpc, tx_manager_tx }
+        Self { config, state, l1_rpc, l2_rpc, game_fetcher_tx, tx_manager_tx }
     }
 
     fn __get_output_root(header: &Header) -> Option<B256> {
@@ -132,7 +134,11 @@ impl GameChallenger {
             let receipt = done_rx.await?; // TODO: allow concurrent submissions
             tracing::info!(%game_index, %game_address, ?receipt, "Submitted challenge transaction");
 
-            // TODO: ask game fetcher to sync again
+            // Wait for game_fetcher to sync once
+            let (done_tx, done_rx) = oneshot::channel();
+            self.game_fetcher_tx.send(GameFetcherRequest::SyncOne(game_index, done_tx)).await?;
+            let changed = done_rx.await?;
+            tracing::info!(%game_index, %changed, "Fetched game again");
         }
 
         Ok(())
