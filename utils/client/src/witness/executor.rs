@@ -19,7 +19,7 @@ use kona_proof::{
     BootInfo, FlushableCache,
 };
 use spin::RwLock;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::{
     client::{advance_to_target, fetch_safe_head_hash},
@@ -46,11 +46,20 @@ where
             return Err(anyhow!("Failed to load boot info: {:?}", e));
         }
     };
+    debug!(
+        target: "client",
+        l1_head = %boot.l1_head,
+        agreed_l2_output_root = %boot.agreed_l2_output_root,
+        claimed_l2_output_root = %boot.claimed_l2_output_root,
+        claimed_l2_block_number = boot.claimed_l2_block_number,
+        "Loaded boot info"
+    );
 
     let boot_clone = boot.clone();
 
     let rollup_config = Arc::new(boot.rollup_config);
     let safe_head_hash = fetch_safe_head_hash(oracle.as_ref(), boot.agreed_l2_output_root).await?;
+    debug!(target: "client", safe_head_hash = %safe_head_hash, "Fetched safe head hash");
 
     let mut l1_provider = OracleL1ChainProvider::new(boot.l1_head, oracle.clone());
     let mut l2_provider =
@@ -60,6 +69,12 @@ where
     let safe_head = l2_provider
         .header_by_hash(safe_head_hash)
         .map(|header| Sealed::new_unchecked(header, safe_head_hash))?;
+    debug!(
+        target: "client",
+        safe_head_number = safe_head.number,
+        safe_head_hash = %safe_head_hash,
+        "Fetched safe head header"
+    );
 
     // If the claimed L2 block number is less than the safe head of the L2 chain, the claim is
     // invalid.
@@ -76,6 +91,7 @@ where
     ////////////////////////////////////////////////////////////////
 
     // Create a new derivation driver with the given boot information and oracle.
+    debug!(target: "client", "Creating oracle pipeline cursor");
     let cursor = new_oracle_pipeline_cursor(
         rollup_config.as_ref(),
         safe_head,
@@ -84,8 +100,10 @@ where
         &mut l2_provider,
     )
     .await?;
+    debug!(target: "client", "Pipeline cursor created, setting on l2_provider");
     l2_provider.set_cursor(cursor.clone());
 
+    debug!(target: "client", "Pipeline inputs ready, returning");
     Ok((boot_clone, Some((cursor, l1_provider, l2_provider))))
 }
 
