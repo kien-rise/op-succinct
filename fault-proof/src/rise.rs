@@ -10,7 +10,20 @@ use alloy_rpc_client::RpcClient;
 use alloy_sol_types::{SolEvent, SolValue};
 use alloy_transport::{RpcError, TransportResult};
 use anyhow::{anyhow, bail, Result};
-use kona_rpc::{OutputResponse, SafeHeadResponse};
+use kona_protocol::L2BlockInfo;
+use kona_rpc::SafeHeadResponse;
+
+/// Minimal subset of the op-node `optimism_outputAtBlock` response.
+///
+/// The upstream `kona_rpc::OutputResponse` embeds `SyncStatus`, which contains interop fields
+/// (`cross_unsafe_l2`, `local_safe_l2`) not returned by older CL implementations. We only need
+/// `output_root` and `block_ref`, so we define our own struct to avoid the deserialization error.
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OutputResponse {
+    pub output_root: B256,
+    pub block_ref: L2BlockInfo,
+}
 
 use crate::contract::{
     AnchorStateRegistry,
